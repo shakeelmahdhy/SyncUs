@@ -1,5 +1,14 @@
 ﻿SyncUs is a skill-matching platform with a React frontend and a FastAPI backend.
 
+## Technologies used
+
+- Frontend: React, Vite, TypeScript
+- Styling/UI: Tailwind CSS, shadcn/ui
+- Backend: FastAPI, Pydantic, SQLAlchemy
+- Platform/DB: Supabase (Postgres + Auth)
+- Caching (planned): Redis
+- Resume ingestion (planned): PDF/OCR parser service
+
 ## Project structure
 
 ```txt
