@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+supabase
+python-dotenv
+
+# Dev/test (optional, add/remove as needed)
+# pytest

@@ -1,8 +1,54 @@
+from uuid import UUID
+
 from fastapi import APIRouter
-from .service import create_user
+
+from .schema import (
+    ApplicationCreateRequest,
+    ApplicationListResponse,
+    ApplicationResponse,
+    ApplicationStatusUpdateRequest,
+    ApplicationStatusUpdateResponse,
+    JobPipelineResponse,
+)
+from .service import (
+    create_application,
+    get_application,
+    get_job_pipeline,
+    list_applications,
+    update_application_status,
+)
 
 router = APIRouter()
 
-@router.post("/")
-def register_user():
-    return create_user()
+
+@router.post("/applications", response_model=ApplicationResponse)
+def apply_to_job(payload: ApplicationCreateRequest) -> ApplicationResponse:
+    return ApplicationResponse(**create_application(payload))
+
+
+@router.get("/applications", response_model=ApplicationListResponse)
+def get_my_applications() -> ApplicationListResponse:
+    return ApplicationListResponse(**list_applications())
+
+
+@router.get("/applications/{application_id}", response_model=ApplicationResponse)
+def get_application_detail(application_id: UUID) -> ApplicationResponse:
+    return ApplicationResponse(**get_application(application_id))
+
+
+@router.patch(
+    "/applications/{application_id}/status",
+    response_model=ApplicationStatusUpdateResponse,
+)
+def transition_application_status(
+    application_id: UUID,
+    payload: ApplicationStatusUpdateRequest,
+) -> ApplicationStatusUpdateResponse:
+    return ApplicationStatusUpdateResponse(
+        **update_application_status(application_id, payload.status)
+    )
+
+
+@router.get("/jobs/{job_id}/pipeline", response_model=JobPipelineResponse)
+def get_pipeline(job_id: UUID) -> JobPipelineResponse:
+    return JobPipelineResponse(**get_job_pipeline(job_id))
