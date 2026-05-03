@@ -1,22 +1,26 @@
 from pydantic import BaseModel
 from uuid import UUID
+from typing import Optional
 
 
-# -------- USER --------
+# -------- USER / JOB SEEKER --------
 class UserCreateRequest(BaseModel):
-    name: str
+    first_name: str
+    last_name: str
     email: str
 
 
 class UserResponse(BaseModel):
     id: UUID
-    name: str
-    email: str
+    first_name: str
+    last_name: str
+    email: Optional[str] = None
 
 
 class UserUpdateRequest(BaseModel):
-    name: Optional[str] | None = None
-    email: Optional[str] | None = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[str] = None
 
 
 # -------- RESUME --------
@@ -26,5 +30,5 @@ class ResumeCreateRequest(BaseModel):
 
 class ResumeResponse(BaseModel):
     id: UUID
+    job_seeker_id: UUID
     file_url: str
-    user_id: UUID
