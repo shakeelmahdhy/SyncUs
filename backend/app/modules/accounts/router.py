@@ -14,6 +14,7 @@ from .service import (
     get_user_profile,
     update_user_profile,
     add_resume
+    parse_profile_data
 )
 
 router = APIRouter()
@@ -26,9 +27,9 @@ def register_user(payload: UserCreateRequest) -> UserResponse:
 
 
 # Get profile
-@router.get("/profile/{user_id}", response_model=UserResponse)
-def get_profile(user_id: UUID) -> UserResponse:
-    return get_user_profile(user_id)
+@router.get("/profile/{user_id}/parse")
+def parse_profile(user_id: UUID):
+    return parse_profile_data(user_id)
 
 
 # Update profile
