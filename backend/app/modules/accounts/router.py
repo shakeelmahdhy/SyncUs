@@ -1,8 +1,43 @@
+from uuid import UUID
 from fastapi import APIRouter
-from .service import create_user
+
+from .schema import (
+    UserCreateRequest,
+    UserResponse,
+    UserUpdateRequest,
+    ResumeCreateRequest,
+    ResumeResponse
+)
+
+from .service import (
+    create_user,
+    get_user_profile,
+    update_user_profile,
+    add_resume
+)
 
 router = APIRouter()
 
-@router.post("/")
-def register_user():
-    return create_user()
+
+# Create user profile (after Supabase signup)
+@router.post("/profile", response_model=UserResponse)
+def register_user(payload: UserCreateRequest) -> UserResponse:
+    return create_user(payload)
+
+
+# Get profile
+@router.get("/profile/{user_id}", response_model=UserResponse)
+def get_profile(user_id: UUID) -> UserResponse:
+    return get_user_profile(user_id)
+
+
+# Update profile
+@router.patch("/profile/{user_id}", response_model=UserResponse)
+def update_profile(user_id: UUID, payload: UserUpdateRequest) -> UserResponse:
+    return update_user_profile(user_id, payload)
+
+
+# Add resume
+@router.post("/profile/{user_id}/resume", response_model=ResumeResponse)
+def upload_resume(user_id: UUID, payload: ResumeCreateRequest) -> ResumeResponse:
+    return add_resume(user_id, payload)
