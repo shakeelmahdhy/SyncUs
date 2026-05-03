@@ -50,3 +50,15 @@ def add_resume(user_id, payload):
 
     response = supabase.table("resumes").insert(data).execute()
     return response.data[0]
+
+def parse_profile_data(user_id):
+    profile = get_user_profile(user_id)
+
+    if not profile:
+        return None
+
+    return {
+        "user_id": user_id,
+        "message": "Profile parsing placeholder (future feature)",
+        "profile": profile
+    }
