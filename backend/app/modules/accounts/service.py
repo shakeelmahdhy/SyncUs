@@ -62,3 +62,31 @@ def parse_profile_data(user_id):
         "message": "Profile parsing placeholder (future feature)",
         "profile": profile
     }
+#--------Add Supabase auth register and login function--------    
+def register_user(payload):
+    auth_response = supabase.auth.sign_up({
+        "email": payload.email,
+        "password": payload.password
+    })
+
+    data = {
+        "user_id": auth_response.user.id,
+        "first_name": payload.first_name,
+        "last_name": payload.last_name,
+        "email": payload.email
+    }
+
+    response = supabase.table("job_seekers").insert(data).execute()
+    return response.data[0]
+
+
+def login_user(payload):
+    response = supabase.auth.sign_in_with_password({
+        "email": payload.email,
+        "password": payload.password
+    })
+
+    return {
+        "access_token": response.session.access_token,
+        "user": response.user
+    }
