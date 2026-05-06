@@ -8,6 +8,8 @@ from .schema import (
     UserUpdateRequest,
     ResumeCreateRequest,
     ResumeResponse
+    RegisterRequest
+    LoginRequest
 )
 
 from .service import (
@@ -17,6 +19,8 @@ from .service import (
     add_resume
     parse_profile_data
     upload_resume_to_storage
+    register_user,
+    login_user
 )
 
 router = APIRouter()
@@ -48,3 +52,12 @@ def upload_resume(user_id: UUID, payload: ResumeCreateRequest) -> ResumeResponse
 @router.post("/profile/{user_id}/resume/upload")
 def upload_resume_file(user_id: UUID, file: UploadFile = File(...)):
     return upload_resume_to_storage(user_id, file)
+
+@router.post("/auth/register")
+def register(payload: RegisterRequest):
+    return register_user(payload)
+
+
+@router.post("/auth/login")
+def login(payload: LoginRequest):
+    return login_user(payload)
