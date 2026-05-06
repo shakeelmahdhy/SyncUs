@@ -32,3 +32,16 @@ class ResumeResponse(BaseModel):
     id: UUID
     job_seeker_id: UUID
     file_url: str
+
+#---------Add Authentication Request schemas ---------
+
+class RegisterRequest(BaseModel):
+    first_name: str
+    last_name: str
+    email: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
