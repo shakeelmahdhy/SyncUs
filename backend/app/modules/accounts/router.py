@@ -16,6 +16,7 @@ from .service import (
     update_user_profile,
     add_resume
     parse_profile_data
+    upload_resume_to_storage
 )
 
 router = APIRouter()
@@ -43,3 +44,7 @@ def update_profile(user_id: UUID, payload: UserUpdateRequest) -> UserResponse:
 @router.post("/profile/{user_id}/resume", response_model=ResumeResponse)
 def upload_resume(user_id: UUID, payload: ResumeCreateRequest) -> ResumeResponse:
     return add_resume(user_id, payload)
+
+@router.post("/profile/{user_id}/resume/upload")
+def upload_resume_file(user_id: UUID, file: UploadFile = File(...)):
+    return upload_resume_to_storage(user_id, file)
