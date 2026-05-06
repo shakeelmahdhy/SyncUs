@@ -90,3 +90,23 @@ def login_user(payload):
         "access_token": response.session.access_token,
         "user": response.user
     }
+
+def upload_resume_to_storage(user_id, file):
+    file_path = f"{user_id}/{file.filename}"
+    file_content = file.file.read()
+
+    supabase.storage.from_("resumes").upload(
+        file_path,
+        file_content
+    )
+
+    public_url = supabase.storage.from_("resumes").get_public_url(file_path)
+
+    data = {
+        "job_seeker_id": str(user_id),
+        "resume_name": file.filename,
+        "file_url": public_url
+    }
+
+    response = supabase.table("resumes").insert(data).execute()
+    return response.data[0]
