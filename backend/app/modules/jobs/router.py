@@ -1,8 +1,3 @@
-"""
-Jobs API Router
-FastAPI routes for job posting management
-"""
-
 from typing import Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, status, Query
@@ -101,12 +96,6 @@ async def update_job(
     current_employer: dict = Depends(get_current_employer),
     job_service: JobService = Depends(get_job_service)
 ) -> Job:
-    """
-    Update a job posting.
-
-    - **job_id**: UUID of the job posting
-    - All fields are optional for update
-    """
     employer_id = UUID(current_employer['id'])
     return await job_service.update_job(job_id, job_data, employer_id)
 
@@ -122,11 +111,6 @@ async def publish_job(
     current_employer: dict = Depends(get_current_employer),
     job_service: JobService = Depends(get_job_service)
 ) -> JobPublishResponse:
-    """
-    Publish a job posting.
-
-    - **job_id**: UUID of the job posting to publish
-    """
     employer_id = UUID(current_employer['id'])
     return await job_service.publish_job(job_id, employer_id)
 
@@ -142,11 +126,6 @@ async def close_job(
     current_employer: dict = Depends(get_current_employer),
     job_service: JobService = Depends(get_job_service)
 ) -> JobCloseResponse:
-    """
-    Close a job posting.
-
-    - **job_id**: UUID of the job posting to close
-    """
     employer_id = UUID(current_employer['id'])
     return await job_service.close_job(job_id, employer_id)
 
@@ -218,13 +197,6 @@ async def get_my_jobs(
     current_employer: dict = Depends(get_current_employer),
     job_service: JobService = Depends(get_job_service)
 ) -> JobListResponse:
-    """
-    Get all jobs posted by the current employer.
-
-    - **status_filter**: Optional filter by status (draft/published/closed)
-    - **page**: Page number for pagination
-    - **page_size**: Number of results per page (max 100)
-    """
     employer_id = UUID(current_employer['id'])
     return await job_service.get_employer_jobs(
         employer_id=employer_id,
@@ -245,11 +217,6 @@ async def delete_job(
     current_employer: dict = Depends(get_current_employer),
     job_service: JobService = Depends(get_job_service)
 ) -> dict:
-    """
-    Delete a job posting (only DRAFT jobs can be deleted).
-
-    - **job_id**: UUID of the job posting to delete
-    """
     employer_id = UUID(current_employer['id'])
     return await job_service.delete_job(job_id, employer_id)
 
@@ -263,11 +230,6 @@ async def get_job_stats(
     current_employer: dict = Depends(get_current_employer),
     job_service: JobService = Depends(get_job_service)
 ) -> dict:
-    """
-    Get job posting statistics for the current employer.
-
-    Returns counts by status and total views/applications.
-    """
     employer_id = UUID(current_employer['id'])
 
     # Get all jobs for this employer
