@@ -1,7 +1,6 @@
-from .supabase_client import get_supabase_anon_client
+from app.core.supabase_client import get_supabase_anon_client
 
 supabase = get_supabase_anon_client()
-
 # ---------------- USER (job_seekers) ---------------- #
 
 def create_user(payload):
