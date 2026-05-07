@@ -1,3 +1,3 @@
 def save_user(data):
-    # Placeholder for DB logic
+    #DB logic
     return data
