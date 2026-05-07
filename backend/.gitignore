@@ -1,0 +1,9 @@
+.env
+.env.*
+
+__pycache__/
+*.py[cod]
+*.pyd
+
+# Venv (if created under backend by mistake)
+.venv/
