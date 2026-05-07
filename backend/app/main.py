@@ -15,8 +15,7 @@ app = FastAPI(
     title="SyncUs API",
     description="Intelligent Job Matching Platform",
     version="1.0.0",
-    docs_url="/api/docs",
-    openapi_url="/api/openapi.json"
+    docs_url="/api/docs"
 )
 
 # CORS middleware configuration
@@ -44,7 +43,7 @@ async def health_check():
 
 
 # Root endpoint
-@app.get("/", tags=["system"])
+@app.get("/")
 async def root():
     return {
         "message": "Welcome to SyncUs API",
@@ -71,19 +70,6 @@ async def global_exception_handler(request, exc):
         }
     )
 
-
-# Startup event
-@app.on_event("startup")
-async def startup_event():
-    print("🚀 SyncUs Backend API starting up...")
-    print(f"📝 API Documentation: http://localhost:8000/api/docs")
-    print(f"🏥 Health Check: http://localhost:8000/health")
-
-
-# Shutdown event
-@app.on_event("shutdown")
-async def shutdown_event():
-    print("👋 SyncUs Backend API shutting down...")
 
 
 if __name__ == "__main__":
