@@ -11,11 +11,11 @@ class UserCreateRequest(BaseModel):
 
 
 class UserResponse(BaseModel):
-    id: UUID
+    id: Optional[UUID] = None        
     first_name: str
     last_name: str
     email: Optional[EmailStr] = None
-    user_id: Optional[UUID] = None
+    user_id: Optional[UUID] = None   
 
 
 class UserUpdateRequest(BaseModel):
@@ -30,10 +30,11 @@ class ResumeCreateRequest(BaseModel):
 
 
 class ResumeResponse(BaseModel):
-    id: UUID
+    id: Optional[UUID] = None         
     job_seeker_id: UUID
     resume_name: Optional[str] = None
     file_url: str
+
 
 
 # -------- AUTH --------
