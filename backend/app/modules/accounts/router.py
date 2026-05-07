@@ -7,8 +7,8 @@ from .schema import (
     UserResponse,
     UserUpdateRequest,
     ResumeCreateRequest,
-    ResumeResponse
-    RegisterRequest
+    ResumeResponse,
+    RegisterRequest,
     LoginRequest
 )
 
