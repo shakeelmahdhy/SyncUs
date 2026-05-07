@@ -16,9 +16,9 @@ from .service import (
     create_user,
     get_user_profile,
     update_user_profile,
-    add_resume
-    parse_profile_data
-    upload_resume_to_storage
+    add_resume,
+    parse_profile_data,
+    upload_resume_to_storage,
     register_user,
     login_user
 )
