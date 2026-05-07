@@ -1,24 +1,33 @@
 from app.core.supabase_client import get_supabase_anon_client
 from fastapi import UploadFile
+from uuid import UUID
+import uuid
 
 supabase = get_supabase_anon_client()
 
 # ---------------- USER (job_seekers) ---------------- #
 
 def create_user(payload):
+    """Create a new profile record in job_seekers."""
     try:
         data = {
             "first_name": payload.first_name,
             "last_name": payload.last_name,
             "email": payload.email,
         }
+
+        # include user_id if payload provides it
+        if hasattr(payload, "user_id") and payload.user_id:
+            data["user_id"] = str(payload.user_id)
+
         response = supabase.table("job_seekers").insert(data).execute()
         return response.data[0]
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": f"Profile creation failed: {str(e)}"}
 
 
-def get_user_profile(user_id):
+def get_user_profile(user_id: UUID):
+    """Fetch a user's profile from job_seekers."""
     try:
         response = supabase.table("job_seekers").select("*").eq("id", str(user_id)).execute()
         if not response.data:
@@ -28,10 +37,11 @@ def get_user_profile(user_id):
         return {"error": f"Unable to fetch profile: {str(e)}"}
 
 
-def update_user_profile(user_id, payload):
+def update_user_profile(user_id: UUID, payload):
+    """Update existing job_seeker profile."""
     try:
         update_data = {
-            key: value for key, value in payload.dict().items() if value is not None
+            key: value for key, value in payload.model_dump(exclude_none=True).items()
         }
         supabase.table("job_seekers").update(update_data).eq("id", str(user_id)).execute()
         return get_user_profile(user_id)
@@ -41,7 +51,8 @@ def update_user_profile(user_id, payload):
 
 # ---------------- RESUME ---------------- #
 
-def add_resume(user_id, payload):
+def add_resume(user_id: UUID, payload):
+    """Add an existing resume record (by URL)."""
     try:
         data = {
             "job_seeker_id": str(user_id),
@@ -53,9 +64,11 @@ def add_resume(user_id, payload):
         return {"error": f"Resume insert failed: {str(e)}"}
 
 
-def upload_resume_to_storage(user_id, file: UploadFile):
+def upload_resume_to_storage(user_id: UUID, file: UploadFile):
+    """Upload resume file to Supabase Storage and register metadata."""
     try:
-        file_path = f"{user_id}/{file.filename}"
+        unique_name = f"{uuid.uuid4()}_{file.filename}"
+        file_path = f"{user_id}/{unique_name}"
         file_bytes = file.file.read()
 
         # Upload to Supabase Storage
@@ -63,9 +76,10 @@ def upload_resume_to_storage(user_id, file: UploadFile):
         if hasattr(upload_response, "error") and upload_response.error:
             return {"error": upload_response.error.message}
 
+        # Generate public URL
         public_url = supabase.storage.from_("resumes").get_public_url(file_path)
 
-        # Store metadata
+        # Insert record into resumes table
         data = {
             "job_seeker_id": str(user_id),
             "resume_name": file.filename,
@@ -80,7 +94,8 @@ def upload_resume_to_storage(user_id, file: UploadFile):
 
 # ---------------- PROFILE DATA PARSING (placeholder) ---------------- #
 
-def parse_profile_data(user_id):
+def parse_profile_data(user_id: UUID):
+    """Placeholder for future NLP-based parsing/inference."""
     profile = get_user_profile(user_id)
     if not profile:
         return {"error": "User not found"}
@@ -106,9 +121,13 @@ def register_user(payload):
             })
 
         # Extract user ID safely
-        user_id = getattr(auth_response.user, "id", None)
-        if not user_id:
+        user = getattr(auth_response, "user", None)
+        if not user:
             return {"error": "Supabase user creation failed"}
+
+        user_id = getattr(user, "id", None)
+        if not user_id:
+            return {"error": "Supabase signup returned no user ID"}
 
         data = {
             "user_id": str(user_id),
@@ -124,9 +143,9 @@ def register_user(payload):
 
 
 def login_user(payload):
-    """Authenticates a user and retrieves token if valid."""
+    """Authenticates a user and retrieves a valid access token."""
     try:
-        # Try both calling patterns for SDK compatibility
+        # Try both function signatures for SDK compatibility
         try:
             response = supabase.auth.sign_in_with_password(email=payload.email, password=payload.password)
         except TypeError:
@@ -135,6 +154,7 @@ def login_user(payload):
                 "password": payload.password
             })
 
+        # Validate access token
         access_token = getattr(response.session, "access_token", None)
         if not access_token:
             return {"error": "Invalid credentials"}
@@ -148,4 +168,3 @@ def login_user(payload):
         }
     except Exception as e:
         return {"error": f"Login failed: {str(e)}"}
-
