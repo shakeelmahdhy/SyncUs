@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from uuid import UUID
 from typing import Optional
 
@@ -7,20 +7,21 @@ from typing import Optional
 class UserCreateRequest(BaseModel):
     first_name: str
     last_name: str
-    email: str
+    email: EmailStr
 
 
 class UserResponse(BaseModel):
     id: UUID
     first_name: str
     last_name: str
-    email: Optional[str] = None
+    email: Optional[EmailStr] = None
+    user_id: Optional[UUID] = None
 
 
 class UserUpdateRequest(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
-    email: Optional[str] = None
+    email: Optional[EmailStr] = None
 
 
 # -------- RESUME --------
@@ -31,17 +32,19 @@ class ResumeCreateRequest(BaseModel):
 class ResumeResponse(BaseModel):
     id: UUID
     job_seeker_id: UUID
+    resume_name: Optional[str] = None
     file_url: str
 
-#---------Add Authentication Request schemas ---------
 
+# -------- AUTH --------
 class RegisterRequest(BaseModel):
     first_name: str
     last_name: str
-    email: str
+    email: EmailStr
     password: str
 
 
 class LoginRequest(BaseModel):
-    email: str
+    email: EmailStr
     password: str
+
