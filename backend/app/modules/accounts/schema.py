@@ -5,9 +5,13 @@ from typing import Optional
 
 # -------- USER / JOB SEEKER --------
 class UserCreateRequest(BaseModel):
+    user_id: UUID
     first_name: str
     last_name: str
     email: EmailStr
+    phone: str
+    location: str
+    bio: str
 
 
 class UserResponse(BaseModel):
@@ -26,6 +30,7 @@ class UserUpdateRequest(BaseModel):
 
 # -------- RESUME --------
 class ResumeCreateRequest(BaseModel):
+    resume_name: str
     file_url: str
 
 
