@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Bell, Briefcase, CheckCircle2, ChevronLeft, ChevronRight, Filter, MapPin, Search, Send, Settings, X } from 'lucide-react';
+import { Briefcase, CheckCircle2, ChevronLeft, ChevronRight, Filter, MapPin, Search, X } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { Job, jobs } from '../data/mockData';
-import syncusCreamLogo from '../components/syncus-cream.png';
+import { SiteFooter, SiteNav } from '../shared/components';
 
 const jobTypes = ['Full-Time', 'Part-Time', 'Casual', 'Contract'];
 const locationModes = ['On-site', 'Remote', 'Hybrid'];
@@ -10,41 +10,6 @@ const JOBS_PER_PAGE = 3;
 
 function normalise(value: string) {
   return value.toLowerCase().replace(/\s+/g, '').replace(/-/g, '');
-}
-
-function SyncUsMark({ compact = false }: { compact?: boolean }) {
-  return (
-    <img
-      src={syncusCreamLogo}
-      alt="SyncUs"
-      className={compact ? 'h-8 w-auto' : 'h-11 w-auto'}
-    />
-  );
-}
-
-function TopNav() {
-  return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-syncus-blue text-syncus-cream shadow-md">
-      <div className="mx-auto flex h-[72px] max-w-[1380px] items-center justify-between px-6 lg:px-10">
-        <div className="flex items-center gap-10">
-          <SyncUsMark compact />
-          <nav className="hidden items-center gap-8 text-sm font-medium md:flex">
-            <a className="transition hover:text-syncus-lime" href="#jobs">Jobs</a>
-            <a className="transition hover:text-syncus-lime" href="#matches">Matches</a>
-            <a className="transition hover:text-syncus-lime" href="#applications">Applications</a>
-            <a className="transition hover:text-syncus-lime" href="#messages">Messages</a>
-          </nav>
-        </div>
-        <div className="flex items-center gap-4">
-          <button className="hidden text-sm font-bold transition hover:text-syncus-lime sm:block" type="button">Post a Job</button>
-          <button className="rounded-lg bg-syncus-lime px-5 py-2 text-sm font-bold text-syncus-blue transition hover:-translate-y-0.5 hover:shadow-card" type="button">Sign In</button>
-          <span className="hidden h-7 w-px bg-white/30 md:block" />
-          <button className="hidden rounded-full p-2 transition hover:bg-white/10 md:block" aria-label="Notifications" type="button"><Bell size={18} /></button>
-          <button className="hidden rounded-full p-2 transition hover:bg-white/10 md:block" aria-label="Settings" type="button"><Settings size={18} /></button>
-        </div>
-      </div>
-    </header>
-  );
 }
 
 function FilterCheckbox({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
@@ -98,51 +63,6 @@ function JobCard({ job, onApply }: { job: Job; onApply: () => void }) {
   );
 }
 
-function Footer() {
-  return (
-    <footer className="bg-syncus-blue text-syncus-cream">
-      <div className="mx-auto grid max-w-[1280px] gap-10 px-8 py-16 md:grid-cols-[1.2fr_1fr_1fr_1.25fr]">
-        <div>
-          <SyncUsMark />
-          <p className="mt-5 max-w-[250px] text-sm leading-relaxed text-white/78">Syncing candidates and employers to find the perfect combination.</p>
-        </div>
-        <div>
-          <h3 className="text-xl font-bold">Platform</h3>
-          <ul className="mt-4 grid gap-3 text-sm text-white/78">
-            <li>Job Search</li>
-            <li>AI Matchmaker</li>
-            <li>For Employers</li>
-            <li>Talent Pool</li>
-          </ul>
-        </div>
-        <div>
-          <h3 className="text-xl font-bold">Resources</h3>
-          <ul className="mt-4 grid gap-3 text-sm text-white/78">
-            <li>Career Design</li>
-            <li>Recruiter Tips</li>
-            <li>Success Stories</li>
-            <li>Contact Support</li>
-          </ul>
-        </div>
-        <div>
-          <h3 className="text-xl font-bold">Newsletter</h3>
-          <p className="mt-4 text-sm leading-relaxed text-white/78">Get the latest jobs and matching insights.</p>
-          <form className="mt-5 flex gap-2" onSubmit={(event) => event.preventDefault()}>
-            <input className="min-h-11 min-w-0 flex-1 rounded-xl bg-syncus-cream px-4 text-sm text-syncus-blue outline-none" placeholder="Email address" type="email" />
-            <button className="grid h-11 w-11 place-items-center rounded-xl border border-syncus-cream text-syncus-cream transition hover:bg-syncus-green" type="submit" aria-label="Subscribe">
-              <Send size={18} />
-            </button>
-          </form>
-        </div>
-      </div>
-      <div className="mx-auto flex max-w-[1280px] flex-col gap-4 border-t border-white/25 px-8 py-6 text-xs text-white/75 md:flex-row md:items-center md:justify-between">
-        <span>© SyncUs AI</span>
-        <div className="flex flex-wrap gap-6"><span>Privacy of Policy</span><span>Terms of Service</span><span>Cookie Policy</span><span>Accessibility</span></div>
-      </div>
-    </footer>
-  );
-}
-
 export function LandingPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
@@ -188,15 +108,15 @@ export function LandingPage() {
 
   return (
     <div className="min-h-screen overflow-hidden bg-syncus-cream text-syncus-blue">
-      <TopNav />
+      <SiteNav />
 
       <main className="relative">
         <div className="pointer-events-none absolute left-[-8%] top-[40px] h-[640px] w-[520px] rounded-[46%] bg-syncus-green/15 blur-3xl" />
         <div className="pointer-events-none absolute left-[28%] top-[130px] h-[430px] w-[360px] rotate-[-17deg] rounded-[38%] bg-syncus-green/12 blur-3xl" />
         <div className="pointer-events-none absolute right-[10%] top-[260px] h-[360px] w-[360px] rounded-full bg-syncus-lime/10 blur-3xl" />
 
-        <section className="relative mx-auto max-w-[1260px] px-5 pb-20 pt-24 text-center sm:px-8 lg:pt-28">
-          <h1 className="mx-auto max-w-[930px] font-serif text-[clamp(3.4rem,8vw,7.9rem)] leading-[0.88] tracking-tight">
+        <section className="relative mx-auto max-w-[1260px] px-5 pb-20 pt-20 text-center sm:px-8 lg:pt-24">
+          <h1 className="mx-auto max-w-[980px] font-serif text-[clamp(3rem,7vw,6.6rem)] leading-[0.96] tracking-normal">
             <span className="block bg-gradient-to-r from-syncus-lime via-syncus-green to-syncus-blue bg-clip-text text-transparent">Syncing You</span>
             <span className="block bg-gradient-to-r from-syncus-lime via-syncus-green to-syncus-blue bg-clip-text text-transparent">With The Perfect Role</span>
           </h1>
@@ -286,7 +206,7 @@ export function LandingPage() {
         </section>
       </main>
 
-      <Footer />
+      <SiteFooter />
 
       {showApplyModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-syncus-blue/45 px-5 backdrop-blur-sm">
