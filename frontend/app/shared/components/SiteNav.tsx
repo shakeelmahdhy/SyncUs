@@ -1,4 +1,5 @@
 import { Bell, Settings } from "lucide-react";
+import { Link } from "react-router";
 import { SyncUsMark } from "./SyncUsMark";
 
 export function SiteNav() {
@@ -8,18 +9,18 @@ export function SiteNav() {
         <div className="flex items-center gap-10">
           <SyncUsMark compact />
           <nav className="hidden items-center gap-8 text-sm font-medium md:flex">
-            <a className="transition hover:text-syncus-lime" href="#jobs">
+            <Link className="transition hover:text-syncus-lime" to="/#jobs">
               Jobs
-            </a>
-            <a className="transition hover:text-syncus-lime" href="#matches">
+            </Link>
+            <Link className="transition hover:text-syncus-lime" to="/#matches">
               Matches
-            </a>
-            <a className="transition hover:text-syncus-lime" href="#applications">
+            </Link>
+            <Link className="transition hover:text-syncus-lime" to="/applications">
               Applications
-            </a>
-            <a className="transition hover:text-syncus-lime" href="#messages">
+            </Link>
+            <Link className="transition hover:text-syncus-lime" to="/#messages">
               Messages
-            </a>
+            </Link>
           </nav>
         </div>
         <div className="flex items-center gap-4">

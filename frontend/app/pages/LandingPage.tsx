@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Briefcase, CheckCircle2, ChevronLeft, ChevronRight, Filter, MapPin, Search, X } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { Job, jobs } from '../data/mockData';
-import { SiteFooter, SiteNav } from '../shared/components';
 
 const jobTypes = ['Full-Time', 'Part-Time', 'Casual', 'Contract'];
 const locationModes = ['On-site', 'Remote', 'Hybrid'];
@@ -107,9 +106,7 @@ export function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen overflow-hidden bg-syncus-cream text-syncus-blue">
-      <SiteNav />
-
+    <div className="overflow-hidden">
       <main className="relative">
         <div className="pointer-events-none absolute left-[-8%] top-[40px] h-[640px] w-[520px] rounded-[46%] bg-syncus-green/15 blur-3xl" />
         <div className="pointer-events-none absolute left-[28%] top-[130px] h-[430px] w-[360px] rotate-[-17deg] rounded-[38%] bg-syncus-green/12 blur-3xl" />
@@ -205,8 +202,6 @@ export function LandingPage() {
           </section>
         </section>
       </main>
-
-      <SiteFooter />
 
       {showApplyModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-syncus-blue/45 px-5 backdrop-blur-sm">
