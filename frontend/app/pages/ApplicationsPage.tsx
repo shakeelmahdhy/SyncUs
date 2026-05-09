@@ -67,32 +67,32 @@ export function ApplicationsPage() {
   ];
 
   return (
-    <main className="min-h-screen bg-syncus-cream px-6 py-10 text-syncus-blue sm:px-10">
-      <section className="mx-auto max-w-[1580px]">
-        <header className="mb-12">
-          <h1 className="font-serif text-[clamp(3.25rem,5vw,5.8rem)] font-bold leading-none tracking-normal text-syncus-blue">
+    <main className="bg-syncus-cream px-5 py-8 text-syncus-blue sm:px-8 lg:py-10">
+      <section className="mx-auto max-w-[1120px]">
+        <header className="mb-7">
+          <h1 className="font-serif text-[clamp(2.35rem,4vw,3.8rem)] font-bold leading-none tracking-normal text-syncus-blue">
             My Applications
           </h1>
-          <p className="mt-5 text-[clamp(1.1rem,1.4vw,1.45rem)] font-medium text-syncus-blue/55">
+          <p className="mt-3 text-base font-medium text-syncus-blue/55 sm:text-lg">
             Track the progress of all your submitted applications
           </p>
         </header>
 
-        <div className="mb-12 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+        <div className="mb-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {stats.map(({ label, value, color }) => (
             <article
               key={label}
-              className="min-h-[135px] rounded-[22px] border-[3px] border-syncus-blue/15 bg-syncus-cream px-8 py-8"
+              className="min-h-[96px] rounded-2xl border-2 border-syncus-blue/15 bg-syncus-cream px-5 py-5"
             >
-              <p className="text-lg font-bold text-syncus-blue/55">{label}</p>
-              <p className="mt-4 text-5xl font-bold leading-none" style={{ color }}>
+              <p className="text-sm font-bold text-syncus-blue/55">{label}</p>
+              <p className="mt-2 text-[2.15rem] font-bold leading-none" style={{ color }}>
                 {value}
               </p>
             </article>
           ))}
         </div>
 
-        <div className="mb-10 flex flex-wrap gap-3">
+        <div className="mb-7 flex gap-2.5 overflow-x-auto pb-2">
           {filterTabs.map((tab) => {
             const isActive = activeTab === tab;
 
@@ -100,7 +100,7 @@ export function ApplicationsPage() {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className="flex min-h-[58px] items-center gap-3 rounded-[20px] border-[3px] px-7 text-xl font-bold transition hover:-translate-y-0.5"
+                className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl border-2 px-4 text-sm font-bold transition hover:-translate-y-0.5 sm:text-base"
                 style={{
                   backgroundColor: isActive ? "#1e4890" : "#f6f8ed",
                   borderColor: "#1e4890",
@@ -111,7 +111,7 @@ export function ApplicationsPage() {
                 {tab}
                 {counts[tab] > 0 && (
                   <span
-                    className="grid h-8 min-w-8 place-items-center rounded-full px-2 text-base font-bold"
+                    className="grid h-6 min-w-6 place-items-center rounded-full px-1.5 text-xs font-bold"
                     style={{
                       backgroundColor: isActive ? "#dbe64c" : "rgba(30,72,144,0.12)",
                       color: "#1e4890",
@@ -125,10 +125,10 @@ export function ApplicationsPage() {
           })}
         </div>
 
-        <div className="grid gap-6">
+        <div className="grid gap-4">
           {filtered.length === 0 ? (
-            <section className="rounded-[22px] border-[3px] border-dashed border-syncus-blue/15 py-16 text-center">
-              <p className="text-xl font-bold text-syncus-blue/55">No {activeTab.toLowerCase()} applications</p>
+            <section className="rounded-2xl border-2 border-dashed border-syncus-blue/15 py-12 text-center">
+              <p className="text-lg font-bold text-syncus-blue/55">No {activeTab.toLowerCase()} applications</p>
             </section>
           ) : (
             filtered.map((application) => {
@@ -137,48 +137,48 @@ export function ApplicationsPage() {
               return (
                 <button
                   key={application.id}
-                  className="grid min-h-[118px] grid-cols-[auto_1fr] items-center gap-6 rounded-[22px] border-[3px] border-syncus-blue/15 bg-syncus-cream px-7 py-6 text-left transition hover:-translate-y-0.5 hover:shadow-card lg:grid-cols-[auto_1fr_auto_auto_auto_auto]"
+                  className="grid min-h-[84px] grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 rounded-2xl border-2 border-syncus-blue/15 bg-syncus-cream px-4 py-4 text-left transition hover:-translate-y-0.5 hover:shadow-card sm:px-5 lg:grid-cols-[auto_minmax(0,1fr)_86px_126px_100px_22px] lg:gap-x-5"
                   onClick={() => navigate(`/jobs/${application.jobId}`)}
                   type="button"
                 >
                   <span
-                    className="grid h-16 w-16 place-items-center rounded-[18px]"
+                    className="grid h-12 w-12 place-items-center rounded-xl"
                     style={{ backgroundColor: bg, color }}
                   >
-                    <StatusIcon size={26} />
+                    <StatusIcon size={20} />
                   </span>
 
                   <span className="min-w-0">
-                    <span className="block truncate text-2xl font-bold text-syncus-blue">
+                    <span className="block truncate text-lg font-bold leading-tight text-syncus-blue sm:text-xl">
                       {application.title}
                     </span>
-                    <span className="mt-2 block truncate text-xl font-medium text-syncus-blue/55">
+                    <span className="mt-1 block truncate text-sm font-medium text-syncus-blue/55 sm:text-base">
                       {application.company} · {application.location}
                     </span>
                   </span>
 
-                  <span className="col-start-2 row-start-2 text-center lg:col-auto lg:row-auto">
+                  <span className="col-start-2 row-start-2 flex items-baseline gap-2 lg:col-auto lg:row-auto lg:block lg:text-center">
                     <span
-                      className="block text-3xl font-bold leading-none"
+                      className="block text-xl font-bold leading-none lg:text-2xl"
                       style={{ color: application.matchScore >= 90 ? "#00804d" : "#1e4890" }}
                     >
                       {application.matchScore}%
                     </span>
-                    <span className="mt-2 block text-lg font-medium text-syncus-blue/55">Match</span>
+                    <span className="block text-sm font-medium text-syncus-blue/55 lg:mt-1">Match</span>
                   </span>
 
                   <span
-                    className="col-start-2 row-start-3 w-fit rounded-full px-6 py-2 text-lg font-bold lg:col-auto lg:row-auto"
+                    className="col-start-2 row-start-3 w-fit rounded-full px-4 py-1.5 text-sm font-bold lg:col-auto lg:row-auto lg:justify-self-center"
                     style={{ backgroundColor: bg, color }}
                   >
                     {statusConfig[application.status].label}
                   </span>
 
-                  <span className="col-start-2 row-start-4 text-lg font-medium text-syncus-blue/55 lg:col-auto lg:row-auto">
+                  <span className="col-start-2 row-start-4 text-sm font-medium text-syncus-blue/55 lg:col-auto lg:row-auto lg:justify-self-center">
                     {application.appliedDate}
                   </span>
 
-                  <ChevronRight className="hidden text-syncus-blue lg:block" size={28} />
+                  <ChevronRight className="hidden text-syncus-blue lg:block" size={21} />
                 </button>
               );
             })
