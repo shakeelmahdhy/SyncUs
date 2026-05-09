@@ -5,6 +5,7 @@ import './styles.css';
 import { ApplicationsPage } from './pages/ApplicationsPage';
 import { JobDetailPage } from './pages/JobsDetailPage';
 import { LandingPage } from './pages/LandingPage';
+import { ProfilePage } from './pages/ProfilePage';
 import { SiteFooter, SiteNav } from './shared/components';
 
 createRoot(document.getElementById('root')!).render(
@@ -16,6 +17,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/" element={<LandingPage />} />
           <Route path="/applications" element={<ApplicationsPage />} />
           <Route path="/jobs/:id" element={<JobDetailPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
           <Route path="*" element={<LandingPage />} />
         </Routes>
         <SiteFooter />
