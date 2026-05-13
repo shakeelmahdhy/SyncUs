@@ -1,7 +1,8 @@
 from uuid import UUID
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from .deps import get_actor_user_id
 from .schema import (
     ApplicationCreateRequest,
     ApplicationListResponse,
@@ -22,8 +23,11 @@ router = APIRouter()
 
 
 @router.post("/applications", response_model=ApplicationResponse)
-def apply_to_job(payload: ApplicationCreateRequest) -> ApplicationResponse:
-    return ApplicationResponse(**create_application(payload))
+def apply_to_job(
+    payload: ApplicationCreateRequest,
+    user_id: UUID = Depends(get_actor_user_id),
+) -> ApplicationResponse:
+    return create_application(user_id, payload)
 
 
 @router.get("/applications", response_model=ApplicationListResponse)
