@@ -1,47 +1,56 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from uuid import UUID
 from typing import Optional
 
 
 # -------- USER / JOB SEEKER --------
 class UserCreateRequest(BaseModel):
+    user_id: UUID
     first_name: str
     last_name: str
-    email: str
+    email: EmailStr
+    phone: str
+    location: str
+    bio: str
 
 
 class UserResponse(BaseModel):
-    id: UUID
+    id: Optional[UUID] = None        
     first_name: str
     last_name: str
-    email: Optional[str] = None
+    email: Optional[EmailStr] = None
+    user_id: Optional[UUID] = None   
 
 
 class UserUpdateRequest(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
-    email: Optional[str] = None
+    email: Optional[EmailStr] = None
 
 
 # -------- RESUME --------
 class ResumeCreateRequest(BaseModel):
+    resume_name: str
     file_url: str
 
 
 class ResumeResponse(BaseModel):
-    id: UUID
+    id: Optional[UUID] = None         
     job_seeker_id: UUID
+    resume_name: Optional[str] = None
     file_url: str
 
-#---------Add Authentication Request schemas ---------
 
+
+# -------- AUTH --------
 class RegisterRequest(BaseModel):
     first_name: str
     last_name: str
-    email: str
+    email: EmailStr
     password: str
 
 
 class LoginRequest(BaseModel):
-    email: str
+    email: EmailStr
     password: str
+

@@ -1,112 +1,193 @@
-from supabase import create_client, Client
-import os
+from app.core.supabase_client import get_supabase_anon_client
+from app.core.supabase_client import get_supabase_service_client
+from fastapi import UploadFile
+from uuid import UUID
+import uuid
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
+supabase = get_supabase_anon_client()
 
 # ---------------- USER (job_seekers) ---------------- #
 
 def create_user(payload):
-    data = {
-        "first_name": payload.first_name,
-        "last_name": payload.last_name,
-        "email": payload.email
-    }
+    """Create a new profile record in job_seekers."""
+    try:
+        user_uuid = str(payload.user_id)
 
-    response = supabase.table("job_seekers").insert(data).execute()
-    return response.data[0]
+        data = {
+            "id": user_uuid,
+            "user_id": user_uuid,
+            "first_name": payload.first_name,
+            "last_name": payload.last_name,
+            "email": payload.email,
+        }
+
+        response = supabase.table("job_seekers").insert(data).execute()
+        return response.data[0]
+
+    except Exception as e:
+        return {"error": f"Profile creation failed: {str(e)}"}
 
 
-def get_user_profile(user_id):
-    response = supabase.table("job_seekers").select("*").eq("id", user_id).execute()
-    return response.data[0] if response.data else None
+def get_user_profile(user_id: UUID):
+    """Fetch a user's profile from job_seekers."""
+    try:
+        response = supabase.table("job_seekers").select("*").eq("id", str(user_id)).execute()
+
+        if not response.data:
+            return None
+
+        return response.data[0]
+
+    except Exception as e:
+        return {"error": f"Unable to fetch profile: {str(e)}"}
 
 
-def update_user_profile(user_id, payload):
-    update_data = {}
+def update_user_profile(user_id: UUID, payload):
+    """Update existing job_seeker profile."""
+    try:
+        update_data = {
+            key: value
+            for key, value in payload.model_dump(exclude_none=True).items()
+        }
 
-    if payload.first_name:
-        update_data["first_name"] = payload.first_name
-    if payload.last_name:
-        update_data["last_name"] = payload.last_name
-    if payload.email:
-        update_data["email"] = payload.email
+        supabase.table("job_seekers").update(update_data).eq("id", str(user_id)).execute()
+        return get_user_profile(user_id)
 
-    supabase.table("job_seekers").update(update_data).eq("id", user_id).execute()
-
-    return get_user_profile(user_id)
+    except Exception as e:
+        return {"error": f"Update failed: {str(e)}"}
 
 
 # ---------------- RESUME ---------------- #
 
-def add_resume(user_id, payload):
-    data = {
-        "job_seeker_id": user_id,
-        "file_url": payload.file_url
-    }
+def add_resume(user_id: UUID, payload):
+    """Add an existing resume record by URL."""
+    try:
+        data = {
+            "job_seeker_id": str(user_id),
+            "resume_name": payload.resume_name,
+            "file_url": payload.file_url,
+        }
 
-    response = supabase.table("resumes").insert(data).execute()
-    return response.data[0]
+        response = supabase.table("resumes").insert(data).execute()
+        return response.data[0]
 
-def parse_profile_data(user_id):
+    except Exception as e:
+        return {"error": f"Resume insert failed: {str(e)}"}
+
+
+def upload_resume_to_storage(user_id: UUID, file: UploadFile):
+    """Upload resume file to Supabase Storage and register metadata."""
+    supabase = get_supabase_service_client()
+
+    try:
+        unique_name = f"{uuid.uuid4()}_{file.filename}"
+        file_path = f"{user_id}/{unique_name}"
+        file_bytes = file.file.read()
+
+        supabase.storage.from_("resumes").upload(
+            path=file_path,
+            file=file_bytes,
+            file_options={"content-type": file.content_type}
+        )
+
+        public_url = supabase.storage.from_("resumes").get_public_url(file_path)
+
+        data = {
+            "job_seeker_id": str(user_id),
+            "resume_name": file.filename,
+            "file_url": public_url,
+        }
+
+        db_response = supabase.table("resumes").insert(data).execute()
+        return db_response.data[0]
+
+    except Exception as e:
+        return {"error": f"Resume upload failed: {str(e)}"}
+
+
+# ---------------- PROFILE DATA PARSING PLACEHOLDER ---------------- #
+
+def parse_profile_data(user_id: UUID):
+    """Placeholder for future NLP-based parsing/inference."""
     profile = get_user_profile(user_id)
 
     if not profile:
-        return None
+        return {"error": "User not found"}
 
     return {
-        "user_id": user_id,
-        "message": "Profile parsing placeholder (future feature)",
-        "profile": profile
+        "user_id": str(user_id),
+        "message": "Profile parsing placeholder (future NLP integration)",
+        "profile": profile,
     }
-#--------Add Supabase auth register and login function--------    
+
+
+# ---------------- AUTH ---------------- #
+
 def register_user(payload):
-    auth_response = supabase.auth.sign_up({
-        "email": payload.email,
-        "password": payload.password
-    })
+    """Registers a user with Supabase Auth and inserts a profile."""
+    try:
+        try:
+            auth_response = supabase.auth.sign_up(
+                email=payload.email,
+                password=payload.password
+            )
+        except TypeError:
+            auth_response = supabase.auth.sign_up({
+                "email": payload.email,
+                "password": payload.password
+            })
 
-    data = {
-        "user_id": auth_response.user.id,
-        "first_name": payload.first_name,
-        "last_name": payload.last_name,
-        "email": payload.email
-    }
+        user = getattr(auth_response, "user", None)
 
-    response = supabase.table("job_seekers").insert(data).execute()
-    return response.data[0]
+        if not user:
+            return {"error": "Supabase user creation failed"}
+
+        user_id = getattr(user, "id", None)
+
+        if not user_id:
+            return {"error": "Supabase signup returned no user ID"}
+
+        data = {
+            "id": str(user_id),
+            "user_id": str(user_id),
+            "first_name": payload.first_name,
+            "last_name": payload.last_name,
+            "email": payload.email,
+        }
+
+        response = supabase.table("job_seekers").insert(data).execute()
+        return response.data[0]
+
+    except Exception as e:
+        return {"error": f"Auth registration failed: {str(e)}"}
 
 
 def login_user(payload):
-    response = supabase.auth.sign_in_with_password({
-        "email": payload.email,
-        "password": payload.password
-    })
+    """Authenticates a user and retrieves a valid access token."""
+    try:
+        try:
+            response = supabase.auth.sign_in_with_password(
+                email=payload.email,
+                password=payload.password
+            )
+        except TypeError:
+            response = supabase.auth.sign_in_with_password({
+                "email": payload.email,
+                "password": payload.password
+            })
 
-    return {
-        "access_token": response.session.access_token,
-        "user": response.user
-    }
+        access_token = getattr(response.session, "access_token", None)
 
-def upload_resume_to_storage(user_id, file):
-    file_path = f"{user_id}/{file.filename}"
-    file_content = file.file.read()
+        if not access_token:
+            return {"error": "Invalid credentials"}
 
-    supabase.storage.from_("resumes").upload(
-        file_path,
-        file_content
-    )
+        return {
+            "access_token": access_token,
+            "user": {
+                "id": str(response.user.id),
+                "email": response.user.email,
+            },
+        }
 
-    public_url = supabase.storage.from_("resumes").get_public_url(file_path)
-
-    data = {
-        "job_seeker_id": str(user_id),
-        "resume_name": file.filename,
-        "file_url": public_url
-    }
-
-    response = supabase.table("resumes").insert(data).execute()
-    return response.data[0]
+    except Exception as e:
+        return {"error": f"Login failed: {str(e)}"}
