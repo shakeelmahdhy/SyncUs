@@ -14,7 +14,7 @@ from .models import (
     JobCloseResponse
 )
 from .service import JobService
-from app.core.dependencies import get_supabase_client, get_current_user, get_current_employer
+from app.core.dependencies import get_supabase_client, get_current_employer, get_optional_user
 from supabase import Client
 
 
@@ -68,7 +68,7 @@ async def create_job(
 )
 async def get_job(
     job_id: UUID,
-    current_user: Optional[dict] = Depends(get_current_user),
+    current_user: Optional[dict] = Depends(get_optional_user),
     job_service: JobService = Depends(get_job_service)
 ) -> Job:
     """

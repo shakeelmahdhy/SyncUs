@@ -15,7 +15,7 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
 # HTTP Bearer token authentication
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
 def get_supabase_client() -> Client:
@@ -55,6 +55,12 @@ async def get_current_user(
         HTTPException: If token is invalid or user not found
     """
     try:
+        if not credentials:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication credentials were not provided"
+            )
+
         token = credentials.credentials
 
         # Verify JWT token with Supabase
@@ -147,7 +153,6 @@ async def get_current_candidate(
 
 async def get_optional_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    supabase: Client = Depends(get_supabase_client)
 ) -> Optional[dict]:
     """
     Get current user if authenticated, otherwise return None
@@ -164,6 +169,7 @@ async def get_optional_user(
         return None
 
     try:
+        supabase = get_supabase_client()
         return await get_current_user(credentials, supabase)
     except HTTPException:
         return None
