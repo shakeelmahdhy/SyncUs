@@ -1,7 +1,30 @@
+"""
+FastAPI entrypoint for SyncUs.
+
+Load backend/.env before importing routers or modules that read os.environ.
+
+Policy: never call supabase.create_client() at module import time in feature
+code. Use app.core.supabase_client.get_supabase_service_client() (or
+get_supabase_publishable_client()) inside functions so missing env or import
+order cannot crash the app during startup discovery.
+"""
+
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+_backend_root = Path(__file__).resolve().parent.parent
+load_dotenv(dotenv_path=_backend_root / ".env")
+
 from fastapi import FastAPI
+<<<<<<< HEAD
+
+from app.api.router import api_router
+=======
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
+>>>>>>> dev
 
 # Import module routers
 from app.modules.jobs import router as jobs_router
@@ -10,6 +33,12 @@ from app.modules.matching import router as matching_router
 from app.modules.tracking import router as tracking_router
 
 
+<<<<<<< HEAD
+
+@app.get("/")
+def root():
+    return {"message": "SyncUs API running 🚀"}
+=======
 # Application metadata
 app = FastAPI(
     title="SyncUs API",
@@ -83,3 +112,4 @@ if __name__ == "__main__":
         reload=True,
         log_level="info"
     )
+>>>>>>> dev
