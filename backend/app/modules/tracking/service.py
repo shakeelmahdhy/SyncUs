@@ -2,8 +2,13 @@ from datetime import datetime, UTC
 from uuid import UUID, uuid4
 
 from .mapping import application_row_to_response
-from .repository import insert_application
-from .schema import ApplicationCreateRequest, ApplicationResponse, ApplicationStatus
+from .repository import insert_application, select_applications_by_user
+from .schema import (
+    ApplicationCreateRequest,
+    ApplicationListResponse,
+    ApplicationResponse,
+    ApplicationStatus,
+)
 
 
 def _base_application(job_id: UUID, status: ApplicationStatus = "applied") -> dict:
@@ -20,16 +25,16 @@ def _base_application(job_id: UUID, status: ApplicationStatus = "applied") -> di
 def create_application(
     user_id: UUID, payload: ApplicationCreateRequest
 ) -> ApplicationResponse:
-    """Persist a new application for ``user_id`` and return the stored row as API model."""
+    """Create a new application for ``user_id`` and return the persisted row as ``ApplicationResponse``."""
     row = insert_application(user_id, payload.job_id, payload.resume_id)
     return application_row_to_response(row)
 
 
-def list_applications() -> dict:
-    return {
-        "items": [],
-        "total": 0,
-    }
+def list_applications(user_id: UUID) -> ApplicationListResponse:
+    """Return all applications for ``user_id``, newest ``created_at`` first."""
+    rows = select_applications_by_user(user_id)
+    items = [application_row_to_response(r) for r in rows]
+    return ApplicationListResponse(items=items, total=len(items))
 
 
 def get_application(application_id: UUID) -> dict:

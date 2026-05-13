@@ -31,8 +31,10 @@ def apply_to_job(
 
 
 @router.get("/applications", response_model=ApplicationListResponse)
-def get_my_applications() -> ApplicationListResponse:
-    return ApplicationListResponse(**list_applications())
+def get_my_applications(
+    user_id: UUID = Depends(get_actor_user_id),
+) -> ApplicationListResponse:
+    return list_applications(user_id)
 
 
 @router.get("/applications/{application_id}", response_model=ApplicationResponse)
