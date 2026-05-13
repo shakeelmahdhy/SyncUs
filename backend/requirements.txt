@@ -2,6 +2,6 @@ fastapi
 uvicorn
 supabase
 python-dotenv
+pyjwt
 
-# Dev/test (optional, add/remove as needed)
-# pytest
+pytest
