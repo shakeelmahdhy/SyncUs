@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from .deps import get_actor_user_id
 from .schema import (
@@ -38,8 +38,17 @@ def get_my_applications(
 
 
 @router.get("/applications/{application_id}", response_model=ApplicationResponse)
-def get_application_detail(application_id: UUID) -> ApplicationResponse:
-    return ApplicationResponse(**get_application(application_id))
+def get_application_detail(
+    application_id: UUID,
+    user_id: UUID = Depends(get_actor_user_id),
+) -> ApplicationResponse:
+    out = get_application(user_id, application_id)
+    if out is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Application not found.",
+        )
+    return out
 
 
 @router.patch(

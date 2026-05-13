@@ -2,7 +2,11 @@ from datetime import datetime, UTC
 from uuid import UUID, uuid4
 
 from .mapping import application_row_to_response
-from .repository import insert_application, select_applications_by_user
+from .repository import (
+    insert_application,
+    select_application_for_user,
+    select_applications_by_user,
+)
 from .schema import (
     ApplicationCreateRequest,
     ApplicationListResponse,
@@ -37,10 +41,19 @@ def list_applications(user_id: UUID) -> ApplicationListResponse:
     return ApplicationListResponse(items=items, total=len(items))
 
 
-def get_application(application_id: UUID) -> dict:
-    application = _base_application(uuid4())
-    application["id"] = application_id
-    return application
+def get_application(
+    user_id: UUID, application_id: UUID
+) -> ApplicationResponse | None:
+    """
+    Return the application if it exists and ``job_seeker_id == user_id``.
+
+    Returns ``None`` when the row is missing or not owned by ``user_id``;
+    the router maps that to an HTTP 404.
+    """
+    row = select_application_for_user(application_id, user_id)
+    if row is None:
+        return None
+    return application_row_to_response(row)
 
 
 def update_application_status(
