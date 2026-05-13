@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Briefcase,
   CheckCircle,
@@ -9,6 +9,7 @@ import {
   Upload,
   User,
 } from "lucide-react";
+import { getAccountProfile, updateAccountProfile, type AccountProfile } from "../lib/api";
 
 interface Resume {
   id: number;
@@ -57,27 +58,94 @@ const professionalFields = [
   { label: "Education", key: "education" },
 ] as const;
 
+const fallbackProfile = {
+  firstName: "Alex",
+  lastName: "Johnson",
+  email: "alex.johnson@email.com",
+  phone: "+61 400 000 000",
+  location: "Sydney, NSW, Australia",
+  title: "Senior Product Designer",
+  experience: "5+ years",
+  bio: "Passionate product designer with 5+ years of experience creating intuitive digital experiences. Specialised in design systems and user research.",
+  linkedin: "linkedin.com/in/alexjohnson",
+  portfolio: "alexjohnson.design",
+  education: "Bachelor of Design, University of Sydney, 2019",
+  company: "Freelance",
+};
+
+type ProfileForm = typeof fallbackProfile;
+
+function toProfileForm(profile: AccountProfile): ProfileForm {
+  return {
+    firstName: profile.first_name,
+    lastName: profile.last_name,
+    email: profile.email,
+    phone: profile.phone,
+    location: profile.location,
+    title: profile.title,
+    experience: profile.experience,
+    bio: profile.bio,
+    linkedin: profile.linkedin,
+    portfolio: profile.portfolio,
+    education: profile.education,
+    company: profile.company,
+  };
+}
+
+function toAccountProfileUpdate(form: ProfileForm, skills: string[]) {
+  return {
+    first_name: form.firstName,
+    last_name: form.lastName,
+    email: form.email,
+    phone: form.phone,
+    location: form.location,
+    title: form.title,
+    experience: form.experience,
+    bio: form.bio,
+    linkedin: form.linkedin,
+    portfolio: form.portfolio,
+    education: form.education,
+    company: form.company,
+    skills,
+  };
+}
+
 export function ProfilePage() {
   const [activeStep, setActiveStep] = useState(0);
   const [resumes, setResumes] = useState(initialResumes);
   const [skills, setSkills] = useState(["Figma", "User Research", "Prototyping", "Design Systems"]);
   const [newSkill, setNewSkill] = useState("");
   const [saved, setSaved] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [savingProfile, setSavingProfile] = useState(false);
 
-  const [form, setForm] = useState({
-    firstName: "Alex",
-    lastName: "Johnson",
-    email: "alex.johnson@email.com",
-    phone: "+61 400 000 000",
-    location: "Sydney, NSW, Australia",
-    title: "Senior Product Designer",
-    experience: "5+ years",
-    bio: "Passionate product designer with 5+ years of experience creating intuitive digital experiences. Specialised in design systems and user research.",
-    linkedin: "linkedin.com/in/alexjohnson",
-    portfolio: "alexjohnson.design",
-    education: "Bachelor of Design, University of Sydney, 2019",
-    company: "Freelance",
-  });
+  const [form, setForm] = useState<ProfileForm>(fallbackProfile);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getAccountProfile()
+      .then((profile) => {
+        if (!isMounted) return;
+        setForm(toProfileForm(profile));
+        setSkills(profile.skills);
+        setProfileError(null);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setProfileError("Using local profile data until the backend is available.");
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoadingProfile(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const profileCompletion = Math.min(
     100,
@@ -88,7 +156,7 @@ export function ProfilePage() {
     )
   );
 
-  const updateField = (key: keyof typeof form, value: string) => {
+  const updateField = (key: keyof ProfileForm, value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
   };
 
@@ -114,9 +182,21 @@ export function ProfilePage() {
     setSkills((current) => current.filter((item) => item !== skill));
   };
 
-  const handleSave = () => {
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 2500);
+  const handleSave = async () => {
+    setSavingProfile(true);
+    setProfileError(null);
+
+    try {
+      const profile = await updateAccountProfile(toAccountProfileUpdate(form, skills));
+      setForm(toProfileForm(profile));
+      setSkills(profile.skills);
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 2500);
+    } catch {
+      setProfileError("Profile changes could not be saved to the backend.");
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   return (
@@ -128,8 +208,9 @@ export function ProfilePage() {
               My Profile
             </h1>
             <p className="mt-3 text-base font-medium text-syncus-blue/55 sm:text-lg">
-              Keep your profile up to date for the best AI match results
+              {loadingProfile ? "Loading your profile..." : "Keep your profile up to date for the best AI match results"}
             </p>
+            {profileError && <p className="mt-2 text-sm font-bold text-red-600">{profileError}</p>}
           </div>
 
           <aside className="w-full rounded-2xl border-2 border-syncus-green bg-syncus-green/5 p-5 md:w-[190px]">
@@ -355,13 +436,14 @@ export function ProfilePage() {
                 onClick={handleSave}
                 className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-syncus-green px-6 text-sm font-bold text-syncus-cream"
                 type="button"
+                disabled={savingProfile}
               >
                 {saved ? (
                   <>
                     <CheckCircle size={14} /> Saved!
                   </>
                 ) : (
-                  "Save Changes"
+                  savingProfile ? "Saving..." : "Save Changes"
                 )}
               </button>
             </footer>

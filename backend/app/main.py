@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 import os
 
 # Import module routers
+from app.modules.accounts.router import router as accounts_router
 from app.modules.jobs import router as jobs_router
 
 
@@ -55,6 +56,7 @@ async def root():
 
 
 # Include module routers
+app.include_router(accounts_router)
 app.include_router(jobs_router)
 
 
