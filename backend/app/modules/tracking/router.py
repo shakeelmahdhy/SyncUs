@@ -38,8 +38,11 @@ def get_my_applications(
 
 
 @router.get("/applications/{application_id}", response_model=ApplicationResponse)
-def get_application_detail(application_id: UUID) -> ApplicationResponse:
-    return ApplicationResponse(**get_application(application_id))
+def get_application_detail(
+    application_id: UUID,
+    user_id: UUID = Depends(get_actor_user_id),
+) -> ApplicationResponse:
+    return get_application(user_id, application_id)
 
 
 @router.patch(
@@ -49,12 +52,14 @@ def get_application_detail(application_id: UUID) -> ApplicationResponse:
 def transition_application_status(
     application_id: UUID,
     payload: ApplicationStatusUpdateRequest,
+    user_id: UUID = Depends(get_actor_user_id),
 ) -> ApplicationStatusUpdateResponse:
-    return ApplicationStatusUpdateResponse(
-        **update_application_status(application_id, payload.status)
-    )
+    return update_application_status(user_id, application_id, payload.status)
 
 
 @router.get("/jobs/{job_id}/pipeline", response_model=JobPipelineResponse)
-def get_pipeline(job_id: UUID) -> JobPipelineResponse:
-    return JobPipelineResponse(**get_job_pipeline(job_id))
+def get_pipeline(
+    job_id: UUID,
+    user_id: UUID = Depends(get_actor_user_id),
+) -> JobPipelineResponse:
+    return get_job_pipeline(user_id, job_id)
