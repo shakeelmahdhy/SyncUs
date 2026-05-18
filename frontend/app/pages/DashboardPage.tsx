@@ -1,3 +1,5 @@
+import { Link } from "react-router";
+
 const jobs = [
   {
     title: "Frontend Developer",
@@ -35,9 +37,15 @@ const interviews = [
 export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-[#F8FAF5] px-10 py-8">
-      <h1 className="text-5xl font-bold text-[#1D2B53] mt-4 mb-10">
-        Dashboard
-      </h1>
+      <div className="mt-4 mb-10 flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-5xl font-bold text-[#1D2B53]">Dashboard</h1>
+        <Link
+          className="rounded-xl bg-[#1D2B53] px-5 py-2.5 text-sm font-bold text-white transition hover:opacity-90"
+          to="/hiring-team"
+        >
+          Manage hiring team
+        </Link>
+      </div>
 
       <div className="grid grid-cols-4 gap-6 mb-10">
 
