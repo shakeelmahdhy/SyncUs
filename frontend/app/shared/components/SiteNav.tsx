@@ -21,6 +21,15 @@ export function SiteNav() {
             <Link className="transition hover:text-syncus-lime" to="/#messages">
               Messages
             </Link>
+            <Link className="transition hover:text-syncus-lime" to="/dashboard">
+              Dashboard
+            </Link>
+            <Link className="transition hover:text-syncus-lime" to="/talent-pool">
+              Talent Pool
+            </Link>
+            <Link className="transition hover:text-syncus-lime" to="/hiring-team">
+              Hiring Team
+            </Link>
           </nav>
         </div>
         <div className="flex items-center gap-4">
