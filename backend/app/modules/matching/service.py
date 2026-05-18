@@ -1,10 +1,15 @@
-from db.supabase_client import supabase
-from sentence_transformers import SentenceTransformer, util
+from app.core.supabase_client import get_supabase_service_client
 
 
 class MatchingService:
     def __init__(self):
-        # Lightweight BERT-style semantic model 
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError as exc:
+            raise RuntimeError(
+                "Matching requires sentence-transformers. "
+                "Install with: pip install sentence-transformers"
+            ) from exc
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
 
     # UTILITY: SAFE NORMALISATION
@@ -26,6 +31,8 @@ class MatchingService:
         # Semantic representation 
         candidate_text = " ".join(candidate_skills)
         job_text = " ".join(job_skills)
+
+        from sentence_transformers import util
 
         embeddings = self.model.encode(
             [candidate_text, job_text],
@@ -97,13 +104,13 @@ class MatchingService:
     def get_job_recommendations(self, user_id: str):
 
         # Fetch only required columns (performance optimisation)
-        candidate = supabase.table("job_seekers") \
+        candidate = get_supabase_service_client().table("job_seekers") \
             .select("id, skills, major, education, academic_units, years_of_experience") \
             .eq("id", user_id) \
             .single() \
             .execute().data
 
-        jobs = supabase.table("jobs") \
+        jobs = get_supabase_service_client().table("jobs") \
             .select("id, title, description, required_skills, experience_required") \
             .eq("status", "published") \
             .execute().data
@@ -127,13 +134,13 @@ class MatchingService:
     # 6. TOP-N CANDIDATES FOR EMPLOYER
     def get_candidate_recommendations(self, job_id: str):
 
-        job = supabase.table("jobs") \
+        job = get_supabase_service_client().table("jobs") \
             .select("id, title, description, required_skills, experience_required") \
             .eq("id", job_id) \
             .single() \
             .execute().data
 
-        candidates = supabase.table("job_seekers") \
+        candidates = get_supabase_service_client().table("job_seekers") \
             .select("id, first_name, last_name, skills, major, education, academic_units, years_of_experience") \
             .execute().data
 
@@ -156,7 +163,7 @@ class MatchingService:
     # 7. MATCH EXPLANATION (FOR DEMO + REPORT MARKS)
     def get_match_explanation(self, match_id: str):
 
-        match = supabase.table("matches") \
+        match = get_supabase_service_client().table("matches") \
             .select("id, score, breakdown_json") \
             .eq("id", match_id) \
             .single() \
