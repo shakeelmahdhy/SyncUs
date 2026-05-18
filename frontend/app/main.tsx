@@ -9,6 +9,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { SiteFooter, SiteNav } from './shared/components';
 import TalentPoolPage from './pages/TalentPoolPage';
 import DashboardPage from './pages/DashboardPage';
+import { HiringTeamPage } from './pages/employer/HiringTeamPage';
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
@@ -21,6 +22,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/talent-pool" element={<TalentPoolPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/hiring-team" element={<HiringTeamPage />} />
           <Route path="*" element={<LandingPage />} />
         </Routes>
         <SiteFooter />
