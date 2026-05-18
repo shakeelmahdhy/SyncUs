@@ -58,7 +58,7 @@ class JobBase(BaseModel):
     max_years_experience: Optional[int] = Field(None, ge=0, le=50)
     salary_min: Optional[int] = Field(None, ge=0)
     salary_max: Optional[int] = Field(None, ge=0)
-    contact_email: str = Field(..., regex=r'^[\w\.-]+@[\w\.-]+\.\w+$')
+    contact_email: str = Field(..., pattern=r'^[\w\.-]+@[\w\.-]+\.\w+$')
     website: Optional[str] = None
 
     @validator('required_skills')
@@ -110,7 +110,7 @@ class JobUpdate(BaseModel):
     max_years_experience: Optional[int] = Field(None, ge=0, le=50)
     salary_min: Optional[int] = Field(None, ge=0)
     salary_max: Optional[int] = Field(None, ge=0)
-    contact_email: Optional[str] = Field(None, regex=r'^[\w\.-]+@[\w\.-]+\.\w+$')
+    contact_email: Optional[str] = Field(None, pattern=r'^[\w\.-]+@[\w\.-]+\.\w+$')
     website: Optional[str] = None
 
 
