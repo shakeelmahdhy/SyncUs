@@ -4,7 +4,11 @@ from fastapi import UploadFile
 from uuid import UUID
 import uuid
 
-supabase = get_supabase_anon_client()
+
+def _anon_supabase():
+    """Return the anon/publishable client; lazy so importing this module does not touch env."""
+    return get_supabase_anon_client()
+
 
 # ---------------- USER (job_seekers) ---------------- #
 
@@ -21,7 +25,7 @@ def create_user(payload):
             "email": payload.email,
         }
 
-        response = supabase.table("job_seekers").insert(data).execute()
+        response = _anon_supabase().table("job_seekers").insert(data).execute()
         return response.data[0]
 
     except Exception as e:
@@ -31,7 +35,13 @@ def create_user(payload):
 def get_user_profile(user_id: UUID):
     """Fetch a user's profile from job_seekers."""
     try:
-        response = supabase.table("job_seekers").select("*").eq("id", str(user_id)).execute()
+        response = (
+            _anon_supabase()
+            .table("job_seekers")
+            .select("*")
+            .eq("id", str(user_id))
+            .execute()
+        )
 
         if not response.data:
             return None
@@ -50,7 +60,7 @@ def update_user_profile(user_id: UUID, payload):
             for key, value in payload.model_dump(exclude_none=True).items()
         }
 
-        supabase.table("job_seekers").update(update_data).eq("id", str(user_id)).execute()
+        _anon_supabase().table("job_seekers").update(update_data).eq("id", str(user_id)).execute()
         return get_user_profile(user_id)
 
     except Exception as e:
@@ -68,7 +78,7 @@ def add_resume(user_id: UUID, payload):
             "file_url": payload.file_url,
         }
 
-        response = supabase.table("resumes").insert(data).execute()
+        response = _anon_supabase().table("resumes").insert(data).execute()
         return response.data[0]
 
     except Exception as e:
@@ -77,20 +87,20 @@ def add_resume(user_id: UUID, payload):
 
 def upload_resume_to_storage(user_id: UUID, file: UploadFile):
     """Upload resume file to Supabase Storage and register metadata."""
-    supabase = get_supabase_service_client()
+    service = get_supabase_service_client()
 
     try:
         unique_name = f"{uuid.uuid4()}_{file.filename}"
         file_path = f"{user_id}/{unique_name}"
         file_bytes = file.file.read()
 
-        supabase.storage.from_("resumes").upload(
+        service.storage.from_("resumes").upload(
             path=file_path,
             file=file_bytes,
             file_options={"content-type": file.content_type}
         )
 
-        public_url = supabase.storage.from_("resumes").get_public_url(file_path)
+        public_url = service.storage.from_("resumes").get_public_url(file_path)
 
         data = {
             "job_seeker_id": str(user_id),
@@ -98,7 +108,7 @@ def upload_resume_to_storage(user_id: UUID, file: UploadFile):
             "file_url": public_url,
         }
 
-        db_response = supabase.table("resumes").insert(data).execute()
+        db_response = service.table("resumes").insert(data).execute()
         return db_response.data[0]
 
     except Exception as e:
@@ -126,13 +136,14 @@ def parse_profile_data(user_id: UUID):
 def register_user(payload):
     """Registers a user with Supabase Auth and inserts a profile."""
     try:
+        sb = _anon_supabase()
         try:
-            auth_response = supabase.auth.sign_up(
+            auth_response = sb.auth.sign_up(
                 email=payload.email,
                 password=payload.password
             )
         except TypeError:
-            auth_response = supabase.auth.sign_up({
+            auth_response = sb.auth.sign_up({
                 "email": payload.email,
                 "password": payload.password
             })
@@ -155,7 +166,7 @@ def register_user(payload):
             "email": payload.email,
         }
 
-        response = supabase.table("job_seekers").insert(data).execute()
+        response = sb.table("job_seekers").insert(data).execute()
         return response.data[0]
 
     except Exception as e:
@@ -165,13 +176,14 @@ def register_user(payload):
 def login_user(payload):
     """Authenticates a user and retrieves a valid access token."""
     try:
+        sb = _anon_supabase()
         try:
-            response = supabase.auth.sign_in_with_password(
+            response = sb.auth.sign_in_with_password(
                 email=payload.email,
                 password=payload.password
             )
         except TypeError:
-            response = supabase.auth.sign_in_with_password({
+            response = sb.auth.sign_in_with_password({
                 "email": payload.email,
                 "password": payload.password
             })
