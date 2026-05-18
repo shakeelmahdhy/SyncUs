@@ -1,28 +1,32 @@
 """
-Actor identity for tracking routes.
+Legacy dev identity helper (superseded by ``app.core.auth``).
 
-Intended to be swapped for a JWT-based dependency when authorization lands.
-Until then: send ``X-User-Id`` (UUID) on requests, or set ``SYNCUS_DEV_USER_ID``.
+Tracking routes now use ``Authorization: Bearer <supabase_access_jwt>`` via
+``CurrentUserIdDep`` in ``router.py``. This module is kept only for local
+scripts or temporary debugging; do not use in new route handlers.
 """
 
 from __future__ import annotations
 
 import os
-from typing import Annotated
 from uuid import UUID
 
 from fastapi import Header, HTTPException
 
 
 def get_actor_user_id(
-    x_user_id: Annotated[str | None, Header(alias="X-User-Id")] = None,
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
 ) -> UUID:
-    """Resolve the authenticated user's id for tracking write/read scope."""
+    """
+    Dev-only actor resolution from ``X-User-Id`` or ``SYNCUS_DEV_USER_ID``.
+
+    Not used by production tracking routes after Phase C2.
+    """
     raw = (x_user_id or os.environ.get("SYNCUS_DEV_USER_ID") or "").strip()
     if not raw:
         raise HTTPException(
             status_code=503,
-            detail="Actor id required: send X-User-Id header or set SYNCUS_DEV_USER_ID until JWT auth is configured.",
+            detail="Send X-User-Id or set SYNCUS_DEV_USER_ID (dev helper only).",
         )
     try:
         return UUID(raw)
