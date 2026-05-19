@@ -8,7 +8,7 @@ from .models import (
     CandidateFilterResponse,
 )
 from .service import SearchService
-from app.core.dependencies import get_current_employer
+from app.core.auth import EmployerUserDep
 from app.core.supabase_client import get_supabase_service_client
 
 router = APIRouter()
@@ -91,7 +91,7 @@ async def filter_candidates(
     sort_by: Optional[str] = Query("relevance", description="relevance | newest | oldest"),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
-    current_employer: dict = Depends(get_current_employer),
+    current_employer: EmployerUserDep,
     search_service: SearchService = Depends(get_search_service),
 ) -> CandidateFilterResponse:
     """

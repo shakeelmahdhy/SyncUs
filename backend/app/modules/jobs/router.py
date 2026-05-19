@@ -14,7 +14,7 @@ from .models import (
     JobCloseResponse
 )
 from .service import JobService
-from app.core.dependencies import get_current_employer, get_optional_user
+from app.core.auth import EmployerUserDep, OptionalUserDep
 from app.core.supabase_client import get_supabase_service_client
 
 
@@ -35,7 +35,7 @@ def get_job_service() -> JobService:
 )
 async def create_job(
     job_data: JobCreate,
-    current_employer: dict = Depends(get_current_employer),
+    current_employer: EmployerUserDep,
     job_service: JobService = Depends(get_job_service)
 ) -> Job:
     """
@@ -56,7 +56,7 @@ async def create_job(
     - **contact_email**: Contact email (required)
     - **website**: Company website URL
     """
-    employer_id = UUID(current_employer['id'])
+    employer_id = current_employer.sub
     return await job_service.create_job(job_data, employer_id)
 
 
@@ -68,7 +68,7 @@ async def create_job(
 )
 async def get_job(
     job_id: UUID,
-    current_user: Optional[dict] = Depends(get_optional_user),
+    current_user: OptionalUserDep,
     job_service: JobService = Depends(get_job_service)
 ) -> Job:
     """
@@ -78,8 +78,8 @@ async def get_job(
     """
     # If user is an employer, verify ownership to see draft jobs
     employer_id = None
-    if current_user and current_user.get('role') == 'employer':
-        employer_id = UUID(current_user['id'])
+    if current_user and current_user.role == "employer":
+        employer_id = current_user.sub
 
     return await job_service.get_job_by_id(job_id, employer_id)
 
@@ -93,10 +93,10 @@ async def get_job(
 async def update_job(
     job_id: UUID,
     job_data: JobUpdate,
-    current_employer: dict = Depends(get_current_employer),
+    current_employer: EmployerUserDep,
     job_service: JobService = Depends(get_job_service)
 ) -> Job:
-    employer_id = UUID(current_employer['id'])
+    employer_id = current_employer.sub
     return await job_service.update_job(job_id, job_data, employer_id)
 
 
@@ -108,10 +108,10 @@ async def update_job(
 )
 async def publish_job(
     job_id: UUID,
-    current_employer: dict = Depends(get_current_employer),
+    current_employer: EmployerUserDep,
     job_service: JobService = Depends(get_job_service)
 ) -> JobPublishResponse:
-    employer_id = UUID(current_employer['id'])
+    employer_id = current_employer.sub
     return await job_service.publish_job(job_id, employer_id)
 
 
@@ -123,10 +123,10 @@ async def publish_job(
 )
 async def close_job(
     job_id: UUID,
-    current_employer: dict = Depends(get_current_employer),
+    current_employer: EmployerUserDep,
     job_service: JobService = Depends(get_job_service)
 ) -> JobCloseResponse:
-    employer_id = UUID(current_employer['id'])
+    employer_id = current_employer.sub
     return await job_service.close_job(job_id, employer_id)
 
 
@@ -194,10 +194,10 @@ async def get_my_jobs(
     status_filter: Optional[JobStatus] = Query(None, description="Filter by job status"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(10, ge=1, le=100, description="Items per page"),
-    current_employer: dict = Depends(get_current_employer),
+    current_employer: EmployerUserDep,
     job_service: JobService = Depends(get_job_service)
 ) -> JobListResponse:
-    employer_id = UUID(current_employer['id'])
+    employer_id = current_employer.sub
     return await job_service.get_employer_jobs(
         employer_id=employer_id,
         status_filter=status_filter,
@@ -214,10 +214,10 @@ async def get_my_jobs(
 )
 async def delete_job(
     job_id: UUID,
-    current_employer: dict = Depends(get_current_employer),
+    current_employer: EmployerUserDep,
     job_service: JobService = Depends(get_job_service)
 ) -> dict:
-    employer_id = UUID(current_employer['id'])
+    employer_id = current_employer.sub
     return await job_service.delete_job(job_id, employer_id)
 
 
@@ -227,10 +227,10 @@ async def delete_job(
     description="Get overview statistics for the current employer's job postings."
 )
 async def get_job_stats(
-    current_employer: dict = Depends(get_current_employer),
+    current_employer: EmployerUserDep,
     job_service: JobService = Depends(get_job_service)
 ) -> dict:
-    employer_id = UUID(current_employer['id'])
+    employer_id = current_employer.sub
 
     # Get all jobs for this employer
     all_jobs = await job_service.get_employer_jobs(
