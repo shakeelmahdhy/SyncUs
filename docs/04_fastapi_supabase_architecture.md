@@ -24,6 +24,12 @@ Supabase Python docs:
 
 ---
 
+## Canonical job table
+
+All backend job CRUD and search use **`public.jobs`** (`id`, `employer_id`, `title`, `description`, `required_skills`, `location`, `work_mode`, `experience_required`, `status`, `created_at`). API field `job_id` maps to column `id`. The legacy `job_postings` name is not used.
+
+---
+
 ## Auth approach inside FastAPI (choose one)
 
 Option A (fast MVP, code-enforced authorization):
