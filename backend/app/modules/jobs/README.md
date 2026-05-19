@@ -40,7 +40,7 @@ The Jobs module handles all job posting functionality in the SyncUs Intelligent 
 
 #### Create Job
 ```http
-POST /skill-sync/v1/jobs
+POST /jobs
 Authorization: Bearer <employer_token>
 Content-Type: application/json
 
@@ -78,14 +78,14 @@ Content-Type: application/json
 
 #### Get Job Details
 ```http
-GET /skill-sync/v1/jobs/{job_id}
+GET /jobs/{job_id}
 ```
 
 **Response:** `200 OK`
 
 #### Update Job
 ```http
-PATCH /skill-sync/v1/jobs/{job_id}
+PATCH /jobs/{job_id}
 Authorization: Bearer <employer_token>
 Content-Type: application/json
 
@@ -99,7 +99,7 @@ Content-Type: application/json
 
 #### Publish Job
 ```http
-POST /skill-sync/v1/jobs/{job_id}/publish
+POST /jobs/{job_id}/publish
 Authorization: Bearer <employer_token>
 ```
 
@@ -115,7 +115,7 @@ Authorization: Bearer <employer_token>
 
 #### Close Job
 ```http
-POST /skill-sync/v1/jobs/{job_id}/close
+POST /jobs/{job_id}/close
 Authorization: Bearer <employer_token>
 ```
 
@@ -123,7 +123,7 @@ Authorization: Bearer <employer_token>
 
 #### Delete Job (Draft Only)
 ```http
-DELETE /skill-sync/v1/jobs/{job_id}
+DELETE /jobs/{job_id}
 Authorization: Bearer <employer_token>
 ```
 
@@ -133,7 +133,7 @@ Authorization: Bearer <employer_token>
 
 #### Search Jobs
 ```http
-GET /skill-sync/v1/jobs?keyword=developer&location=sydney&work_mode=remote&skills=react,python&page=1&page_size=10
+GET /jobs?keyword=developer&location=sydney&work_mode=remote&skills=react,python&page=1&page_size=10
 ```
 
 **Query Parameters:**
@@ -161,7 +161,7 @@ GET /skill-sync/v1/jobs?keyword=developer&location=sydney&work_mode=remote&skill
 
 #### Get My Jobs (Employer)
 ```http
-GET /skill-sync/v1/jobs/employer/my-jobs?status_filter=published&page=1&page_size=10
+GET /jobs/employer/my-jobs?status_filter=published&page=1&page_size=10
 Authorization: Bearer <employer_token>
 ```
 
@@ -169,7 +169,7 @@ Authorization: Bearer <employer_token>
 
 #### Get Job Statistics (Employer)
 ```http
-GET /skill-sync/v1/jobs/stats/overview
+GET /jobs/stats/overview
 Authorization: Bearer <employer_token>
 ```
 

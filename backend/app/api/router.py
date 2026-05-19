@@ -1,3 +1,10 @@
+"""
+Aggregate module routers with a single prefix per feature.
+
+Final paths: ``/accounts/*``, ``/jobs/*``, ``/matching/*``, ``/tracking/*``, ``/search/*``.
+Do not add version prefixes on individual module routers (avoids ``/jobs/skill-sync/v1/jobs``).
+"""
+
 from fastapi import APIRouter
 
 from app.modules.accounts.router import router as accounts_router

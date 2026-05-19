@@ -37,11 +37,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export function getAccountProfile() {
-  return request<AccountProfile>("/skill-sync/v1/accounts/me");
+  return request<AccountProfile>("/accounts/me");
 }
 
 export function updateAccountProfile(profile: AccountProfileUpdate) {
-  return request<AccountProfile>("/skill-sync/v1/accounts/me", {
+  return request<AccountProfile>("/accounts/me", {
     method: "PUT",
     body: JSON.stringify(profile),
   });
@@ -104,9 +104,9 @@ export function searchJobs(params: JobSearchParams = {}) {
   if (params.page_size) searchParams.set("page_size", String(params.page_size));
 
   const query = searchParams.toString();
-  return request<JobListResponse>(`/skill-sync/v1/jobs${query ? `?${query}` : ""}`);
+  return request<JobListResponse>(`/jobs${query ? `?${query}` : ""}`);
 }
 
 export function getJob(jobId: string) {
-  return request<BackendJob>(`/skill-sync/v1/jobs/${jobId}`);
+  return request<BackendJob>(`/jobs/${jobId}`);
 }

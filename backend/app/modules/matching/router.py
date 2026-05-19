@@ -2,10 +2,7 @@ from fastapi import APIRouter, Query
 
 from app.modules.matching.service import MatchingService
 
-router = APIRouter(
-    prefix="/sync-us/v1/matching",
-    tags=["Matching"],
-)
+router = APIRouter()
 
 _service: MatchingService | None = None
 

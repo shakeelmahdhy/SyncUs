@@ -18,7 +18,7 @@ from app.core.auth import EmployerUserDep, OptionalUserDep
 from app.core.supabase_client import get_supabase_service_client
 
 
-router = APIRouter(prefix="/skill-sync/v1/jobs", tags=["jobs"])
+router = APIRouter()
 
 
 def get_job_service() -> JobService:
