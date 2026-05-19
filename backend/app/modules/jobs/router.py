@@ -191,11 +191,11 @@ async def search_jobs(
     description="Get all job postings created by the current employer."
 )
 async def get_my_jobs(
+    current_employer: EmployerUserDep,
     status_filter: Optional[JobStatus] = Query(None, description="Filter by job status"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(10, ge=1, le=100, description="Items per page"),
-    current_employer: EmployerUserDep,
-    job_service: JobService = Depends(get_job_service)
+    job_service: JobService = Depends(get_job_service),
 ) -> JobListResponse:
     employer_id = current_employer.sub
     return await job_service.get_employer_jobs(
