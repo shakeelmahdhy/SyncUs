@@ -14,16 +14,16 @@ from .models import (
     JobCloseResponse
 )
 from .service import JobService
-from app.core.dependencies import get_supabase_client, get_current_employer, get_optional_user
-from supabase import Client
+from app.core.dependencies import get_current_employer, get_optional_user
+from app.core.supabase_client import get_supabase_service_client
 
 
 router = APIRouter(prefix="/skill-sync/v1/jobs", tags=["jobs"])
 
 
-def get_job_service(supabase: Client = Depends(get_supabase_client)) -> JobService:
-    """Dependency to get JobService instance"""
-    return JobService(supabase)
+def get_job_service() -> JobService:
+    """Build JobService with the shared server-side Supabase client (Option A)."""
+    return JobService(get_supabase_service_client())
 
 
 @router.post(

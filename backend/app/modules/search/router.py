@@ -1,6 +1,5 @@
 from typing import Optional, List
 from fastapi import APIRouter, Depends, Query
-from supabase import Client
 
 from .models import (
     JobSearchRequest,
@@ -9,16 +8,15 @@ from .models import (
     CandidateFilterResponse,
 )
 from .service import SearchService
-from app.core.dependencies import (
-    get_supabase_client,
-    get_current_employer,
-)
+from app.core.dependencies import get_current_employer
+from app.core.supabase_client import get_supabase_service_client
 
 router = APIRouter()
 
 
-def get_search_service(supabase: Client = Depends(get_supabase_client)) -> SearchService:
-    return SearchService(supabase)
+def get_search_service() -> SearchService:
+    """Build SearchService with the shared server-side Supabase client (Option A)."""
+    return SearchService(get_supabase_service_client())
 
 
 @router.get(

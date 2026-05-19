@@ -1,18 +1,18 @@
 """
 Core Dependencies
-Shared dependencies for authentication and database access
+Shared dependencies for authentication (legacy jobs/search auth helpers).
+
+Database access for new code should use ``app.core.supabase_client``
+(``get_supabase_service_client`` / ``get_supabase_publishable_client``).
 """
 
 from typing import Optional
+
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from supabase import create_client, Client
-import os
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from supabase import Client
 
-
-# Supabase configuration
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+from app.core.supabase_client import get_supabase_service_client
 
 # HTTP Bearer token authentication
 security = HTTPBearer(auto_error=False)
@@ -20,21 +20,13 @@ security = HTTPBearer(auto_error=False)
 
 def get_supabase_client() -> Client:
     """
-    Get Supabase client instance
+    Return the shared service-role Supabase client.
 
-    Returns:
-        Supabase client
-
-    Raises:
-        HTTPException: If Supabase credentials are not configured
+    Deprecated for new modules: import ``get_supabase_service_client`` directly.
+    Kept so existing ``Depends(get_supabase_client)`` auth paths keep working
+    without ``SUPABASE_KEY`` in the environment.
     """
-    if not SUPABASE_URL or not SUPABASE_KEY:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Supabase configuration missing"
-        )
-
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
+    return get_supabase_service_client()
 
 
 async def get_current_user(
