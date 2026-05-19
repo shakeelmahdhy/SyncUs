@@ -128,6 +128,27 @@ def update_application_status_for_user(
     return rows[0] if rows else None  # type: ignore[return-value]
 
 
+def select_job_employer_id(job_id: UUID) -> UUID | None:
+    """
+    Return ``employer_id`` for a row in ``public.jobs``, or ``None`` if missing.
+
+    Used by the service layer to authorize pipeline reads before calling
+    ``select_applications_for_job``.
+    """
+    client = get_supabase_service_client()
+    response = (
+        client.table("jobs")
+        .select("employer_id")
+        .eq("id", str(job_id))
+        .limit(1)
+        .execute()
+    )
+    rows = response.data or []
+    if not rows or rows[0].get("employer_id") is None:
+        return None
+    return UUID(rows[0]["employer_id"])
+
+
 def select_applications_for_job(job_id: UUID) -> list[ApplicationRow]:
     """
     Return all applications for `job_id`.
