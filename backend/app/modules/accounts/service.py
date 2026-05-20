@@ -25,6 +25,14 @@ def create_user(payload):
             "first_name": payload.first_name,
             "last_name": payload.last_name,
             "email": payload.email,
+            "phone": payload.phone,
+            "location": payload.location,
+            "bio": payload.bio,
+            "work_experience": payload.work_experience,
+            "skills": payload.skills,
+            "preferred_working_mode": payload.preferred_working_mode,
+            "preferred_location": payload.preferred_location,
+            "membership": payload.membership,
         }
 
         response = supabase.table("job_seekers").insert(data).execute()
