@@ -89,6 +89,13 @@ class JobService:
                 )
 
             row = response.data[0]
+
+            # Increment view count if job is published and not viewed by owner
+            if row["status"] == JobStatus.PUBLISHED.value and str(employer_id) != row["employer_id"]:
+                self.db.rpc('increment_job_views', {'job_id': str(job_id)}).execute()
+                # Update the local row object so the returned Job model has the incremented count
+                row["views_count"] = row.get("views_count", 0) + 1
+
             emp_id = UUID(row["employer_id"])
             return row_to_job(row, company_name=self._company_name_for(emp_id))
 
