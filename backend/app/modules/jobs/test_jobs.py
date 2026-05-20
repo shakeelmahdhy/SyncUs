@@ -21,6 +21,45 @@ from .service import JobService
 from fastapi import HTTPException
 
 
+def _jobs_row(**overrides):
+    """Minimal ``public.jobs`` row for service tests."""
+    base = {
+        "id": str(uuid4()),
+        "employer_id": str(uuid4()),
+        "title": "Test Job",
+        "description": "A" * 100,
+        "required_skills": ["python"],
+        "location": "Sydney",
+        "work_mode": "remote",
+        "experience_required": 0,
+        "status": "draft",
+        "created_at": datetime.utcnow().isoformat() + "Z",
+    }
+    base.update(overrides)
+    return base
+
+
+def _configure_supabase_tables(
+    mock_supabase, jobs_table: Mock, company_name: str = "Test Company"
+):
+    """Route ``table('jobs')`` and ``table('employers')`` for service tests."""
+    emp_table = Mock()
+    emp_response = Mock()
+    emp_response.data = [{"company_name": company_name}]
+    emp_table.select.return_value.eq.return_value.limit.return_value.execute.return_value = (
+        emp_response
+    )
+
+    def table_side_effect(name):
+        if name == "jobs":
+            return jobs_table
+        if name == "employers":
+            return emp_table
+        raise ValueError(f"unexpected table: {name}")
+
+    mock_supabase.table.side_effect = table_side_effect
+
+
 @pytest.fixture
 def mock_supabase():
     """Mock Supabase client"""
@@ -159,32 +198,27 @@ class TestJobService:
     @pytest.mark.asyncio
     async def test_create_job_success(self, job_service, mock_supabase, sample_job_data, sample_employer_id):
         """Test successful job creation"""
-        # Mock Supabase response
+        jobs_table = Mock()
         mock_response = Mock()
-        mock_response.data = [{
-            **sample_job_data.dict(),
-            'job_id': str(uuid4()),
-            'employer_id': str(sample_employer_id),
-            'status': 'draft',
-            'views_count': 0,
-            'applications_count': 0,
-            'created_at': datetime.utcnow().isoformat(),
-            'updated_at': datetime.utcnow().isoformat(),
-            'published_at': None,
-            'closed_at': None
-        }]
+        mock_response.data = [
+            _jobs_row(
+                employer_id=str(sample_employer_id),
+                title=sample_job_data.title,
+                status="draft",
+            )
+        ]
+        jobs_table.insert.return_value.execute.return_value = mock_response
+        _configure_supabase_tables(
+            mock_supabase, jobs_table, sample_job_data.company_name
+        )
 
-        mock_supabase.table.return_value.insert.return_value.execute.return_value = mock_response
-
-        # Create job
         result = await job_service.create_job(sample_job_data, sample_employer_id)
 
-        # Assertions
         assert result.title == sample_job_data.title
         assert result.status == JobStatus.DRAFT
         assert result.views_count == 0
         assert result.applications_count == 0
-        mock_supabase.table.assert_called_with('job_postings')
+        mock_supabase.table.assert_any_call("jobs")
 
     @pytest.mark.asyncio
     async def test_create_job_failure(self, job_service, mock_supabase, sample_job_data, sample_employer_id):
@@ -205,42 +239,23 @@ class TestJobService:
     async def test_get_job_by_id_success(self, job_service, mock_supabase):
         """Test successful job retrieval"""
         job_id = uuid4()
+        employer_id = uuid4()
+        jobs_table = Mock()
         mock_response = Mock()
-        mock_response.data = [{
-            'job_id': str(job_id),
-            'employer_id': str(uuid4()),
-            'title': 'Test Job',
-            'company_name': 'Test Company',
-            'description': 'A' * 100,
-            'required_skills': ['python'],
-            'location': 'Sydney',
-            'work_mode': 'remote',
-            'education_level': 'bachelor',
-            'experience_level': 'mid',
-            'contact_email': 'test@example.com',
-            'status': 'published',
-            'views_count': 10,
-            'applications_count': 5,
-            'created_at': datetime.utcnow().isoformat(),
-            'updated_at': datetime.utcnow().isoformat(),
-            'published_at': datetime.utcnow().isoformat(),
-            'closed_at': None,
-            'min_years_experience': None,
-            'max_years_experience': None,
-            'salary_min': None,
-            'salary_max': None,
-            'website': None
-        }]
+        mock_response.data = [
+            _jobs_row(
+                id=str(job_id),
+                employer_id=str(employer_id),
+                status="published",
+            )
+        ]
+        jobs_table.select.return_value.eq.return_value.execute.return_value = mock_response
+        _configure_supabase_tables(mock_supabase, jobs_table)
 
-        mock_supabase.table.return_value.select.return_value.eq.return_value.execute.return_value = mock_response
-        mock_supabase.table.return_value.update.return_value.eq.return_value.execute.return_value = Mock()
-
-        # Get job
         result = await job_service.get_job_by_id(job_id)
 
-        # Assertions
         assert result.job_id == job_id
-        assert result.title == 'Test Job'
+        assert result.title == "Test Job"
 
     @pytest.mark.asyncio
     async def test_get_job_not_found(self, job_service, mock_supabase):
@@ -261,48 +276,30 @@ class TestJobService:
     async def test_publish_job_success(self, job_service, mock_supabase, sample_employer_id):
         """Test successful job publishing"""
         job_id = uuid4()
+        draft_row = _jobs_row(
+            id=str(job_id),
+            employer_id=str(sample_employer_id),
+            status="draft",
+        )
 
-        # Mock existing job (draft)
+        jobs_table = Mock()
         existing_job_response = Mock()
-        existing_job_response.data = [{
-            'job_id': str(job_id),
-            'employer_id': str(sample_employer_id),
-            'title': 'Test Job',
-            'status': 'draft',
-            'views_count': 0,
-            'company_name': 'Test',
-            'description': 'A' * 100,
-            'required_skills': ['python'],
-            'location': 'Sydney',
-            'work_mode': 'remote',
-            'education_level': 'any',
-            'experience_level': 'any',
-            'contact_email': 'test@example.com',
-            'applications_count': 0,
-            'created_at': datetime.utcnow().isoformat(),
-            'updated_at': datetime.utcnow().isoformat(),
-            'published_at': None,
-            'closed_at': None,
-            'min_years_experience': None,
-            'max_years_experience': None,
-            'salary_min': None,
-            'salary_max': None,
-            'website': None
-        }]
+        existing_job_response.data = [draft_row]
 
-        # Mock publish update
         publish_response = Mock()
-        publish_response.data = [existing_job_response.data[0].copy()]
-        publish_response.data[0]['status'] = 'published'
-        publish_response.data[0]['published_at'] = datetime.utcnow().isoformat()
+        published_row = {**draft_row, "status": "published"}
+        publish_response.data = [published_row]
 
-        mock_supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = existing_job_response
-        mock_supabase.table.return_value.update.return_value.eq.return_value.eq.return_value.execute.return_value = publish_response
+        jobs_table.select.return_value.eq.return_value.eq.return_value.execute.return_value = (
+            existing_job_response
+        )
+        jobs_table.update.return_value.eq.return_value.eq.return_value.execute.return_value = (
+            publish_response
+        )
+        _configure_supabase_tables(mock_supabase, jobs_table)
 
-        # Publish job
         result = await job_service.publish_job(job_id, sample_employer_id)
 
-        # Assertions
         assert result.job_id == job_id
         assert result.status == JobStatus.PUBLISHED
         assert result.published_at is not None
@@ -314,35 +311,20 @@ class TestJobService:
 
         # Mock existing job (already published)
         existing_job_response = Mock()
-        existing_job_response.data = [{
-            'job_id': str(job_id),
-            'employer_id': str(sample_employer_id),
-            'status': 'published',  # Already published
-            'title': 'Test',
-            'company_name': 'Test',
-            'description': 'A' * 100,
-            'required_skills': ['python'],
-            'location': 'Sydney',
-            'work_mode': 'remote',
-            'education_level': 'any',
-            'experience_level': 'any',
-            'contact_email': 'test@example.com',
-            'views_count': 0,
-            'applications_count': 0,
-            'created_at': datetime.utcnow().isoformat(),
-            'updated_at': datetime.utcnow().isoformat(),
-            'published_at': datetime.utcnow().isoformat(),
-            'closed_at': None,
-            'min_years_experience': None,
-            'max_years_experience': None,
-            'salary_min': None,
-            'salary_max': None,
-            'website': None
-        }]
+        existing_job_response.data = [
+            _jobs_row(
+                id=str(job_id),
+                employer_id=str(sample_employer_id),
+                status="published",
+            )
+        ]
 
-        mock_supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = existing_job_response
+        jobs_table = Mock()
+        jobs_table.select.return_value.eq.return_value.eq.return_value.execute.return_value = (
+            existing_job_response
+        )
+        _configure_supabase_tables(mock_supabase, jobs_table)
 
-        # Should raise 400
         with pytest.raises(HTTPException) as exc_info:
             await job_service.publish_job(job_id, sample_employer_id)
 
@@ -386,16 +368,14 @@ class TestJobService:
         mock_order.range.return_value = mock_range
         mock_range.execute.return_value = mock_response
 
-        mock_supabase.table.return_value = mock_table
+        _configure_supabase_tables(mock_supabase, mock_table)
 
-        # Search jobs
         result = await job_service.search_jobs(filters)
 
-        # Assertions
         assert result.total == 0
         assert result.page == 1
         assert result.page_size == 10
-        mock_supabase.table.assert_called_with('job_postings')
+        mock_supabase.table.assert_any_call("jobs")
 
 
 def test_job_search_filters_model():
