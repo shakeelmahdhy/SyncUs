@@ -62,10 +62,11 @@ def parse_profile(user_id: UUID):
 def update_profile(user_id: UUID, payload: UserUpdateRequest) -> UserResponse:
     """Update personal information for a user profile."""
     result = update_user_profile(user_id, payload)
-    if not result or "error" in result:
+    if not result:
         raise HTTPException(status_code=404, detail="User not found")
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
     return result
-
 
 # ---------------- RESUME MANAGEMENT ---------------- #
 
