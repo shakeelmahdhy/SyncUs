@@ -1,5 +1,6 @@
 from uuid import UUID
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from app.core.auth import CurrentUser, get_current_user
 
 from .schema import (
     UserCreateRequest,
@@ -40,51 +41,80 @@ def create_profile(payload: UserCreateRequest) -> UserResponse:
     return result
 
 
-@router.get("/profile/{user_id}", response_model=UserResponse)
-def get_profile(user_id: UUID):
-    """Fetch an existing profile by user_id."""
-    result = get_user_profile(user_id)
+@router.get("/profile/me", response_model=UserResponse)
+def get_profile(
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Fetch authenticated user's profile."""
+    
+    result = get_user_profile(current_user.id)
+
     if not result:
         raise HTTPException(status_code=404, detail="User not found")
+
     return result
 
 
-@router.get("/profile/{user_id}/parse")
-def parse_profile(user_id: UUID):
+@router.get("/profile/me/parse")
+def parse_profile(
+    current_user: CurrentUser = Depends(get_current_user),
+):
     """Placeholder for future resume/profile parsing feature."""
-    result = parse_profile_data(user_id)
+
+    result = parse_profile_data(current_user.id)
+
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
+
     return result
 
 
-@router.patch("/profile/{user_id}", response_model=UserResponse)
-def update_profile(user_id: UUID, payload: UserUpdateRequest) -> UserResponse:
-    """Update personal information for a user profile."""
-    result = update_user_profile(user_id, payload)
+@router.patch("/profile/me", response_model=UserResponse)
+def update_profile(
+    payload: UserUpdateRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> UserResponse:
+    """Update authenticated user's profile."""
+
+    result = update_user_profile(current_user.id, payload)
+
     if not result:
         raise HTTPException(status_code=404, detail="User not found")
+
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
+
     return result
 
 # ---------------- RESUME MANAGEMENT ---------------- #
 
-@router.post("/profile/{user_id}/resume", response_model=ResumeResponse)
-def add_resume_record(user_id: UUID, payload: ResumeCreateRequest) -> ResumeResponse:
-    """Add an existing resume record by providing a file URL."""
-    result = add_resume(user_id, payload)
+@router.post("/profile/me/resume", response_model=ResumeResponse)
+def add_resume_record(
+    payload: ResumeCreateRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> ResumeResponse:
+    """Add resume record for authenticated user."""
+
+    result = add_resume(current_user.id, payload)
+
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
+
     return result
 
 
-@router.post("/profile/{user_id}/resume/upload")
-def upload_resume_file(user_id: UUID, file: UploadFile = File(...)):
-    """Upload a resume file to Supabase Storage and save its metadata."""
-    result = upload_resume_to_storage(user_id, file)
+@router.post("/profile/me/resume/upload")
+def upload_resume_file(
+    file: UploadFile = File(...),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Upload resume for authenticated user."""
+
+    result = upload_resume_to_storage(current_user.id, file)
+
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
+
     return result
 
 
