@@ -1,6 +1,7 @@
 from uuid import UUID
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
-from app.core.auth import CurrentUser, get_current_user
+from fastapi import APIRouter, UploadFile, File, HTTPException
+
+from app.core.auth import CurrentUserIdDep
 
 from .schema import (
     UserCreateRequest,
@@ -30,38 +31,37 @@ router = APIRouter()
 @router.post("/profile", response_model=UserResponse)
 def create_profile(payload: UserCreateRequest) -> UserResponse:
     """
-    (Deprecated/Optional)
-    Profile creation is handled during /auth/register.
-    Use this endpoint only if user_id is already created 
-    and you need to manually insert a record.
+    Optional/manual profile creation.
+    Normally profile creation is handled during /auth/register.
     """
     result = create_user(payload)
+
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
+
     return result
 
 
 @router.get("/profile/me", response_model=UserResponse)
-def get_profile(
-    current_user: CurrentUser = Depends(get_current_user),
-):
+def get_profile(current_user_id: CurrentUserIdDep) -> UserResponse:
     """Fetch authenticated user's profile."""
-    
-    result = get_user_profile(current_user.id)
+
+    result = get_user_profile(current_user_id)
 
     if not result:
         raise HTTPException(status_code=404, detail="User not found")
+
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
 
     return result
 
 
 @router.get("/profile/me/parse")
-def parse_profile(
-    current_user: CurrentUser = Depends(get_current_user),
-):
+def parse_profile(current_user_id: CurrentUserIdDep):
     """Placeholder for future resume/profile parsing feature."""
 
-    result = parse_profile_data(current_user.id)
+    result = parse_profile_data(current_user_id)
 
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
@@ -72,11 +72,11 @@ def parse_profile(
 @router.patch("/profile/me", response_model=UserResponse)
 def update_profile(
     payload: UserUpdateRequest,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user_id: CurrentUserIdDep,
 ) -> UserResponse:
     """Update authenticated user's profile."""
 
-    result = update_user_profile(current_user.id, payload)
+    result = update_user_profile(current_user_id, payload)
 
     if not result:
         raise HTTPException(status_code=404, detail="User not found")
@@ -86,16 +86,17 @@ def update_profile(
 
     return result
 
+
 # ---------------- RESUME MANAGEMENT ---------------- #
 
 @router.post("/profile/me/resume", response_model=ResumeResponse)
 def add_resume_record(
     payload: ResumeCreateRequest,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user_id: CurrentUserIdDep,
 ) -> ResumeResponse:
     """Add resume record for authenticated user."""
 
-    result = add_resume(current_user.id, payload)
+    result = add_resume(current_user_id, payload)
 
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -105,12 +106,12 @@ def add_resume_record(
 
 @router.post("/profile/me/resume/upload")
 def upload_resume_file(
+    current_user_id: CurrentUserIdDep,
     file: UploadFile = File(...),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     """Upload resume for authenticated user."""
 
-    result = upload_resume_to_storage(current_user.id, file)
+    result = upload_resume_to_storage(current_user_id, file)
 
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -123,19 +124,24 @@ def upload_resume_file(
 @router.post("/auth/register")
 def register(payload: RegisterRequest):
     """
-    Register a new user with Supabase Auth 
+    Register a new user with Supabase Auth
     and automatically create a job_seeker profile.
     """
     result = register_user(payload)
+
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
+
     return result
 
 
 @router.post("/auth/login")
 def login(payload: LoginRequest):
     """Authenticate a user and return a Supabase access token."""
+
     result = login_user(payload)
+
     if "error" in result:
         raise HTTPException(status_code=401, detail=result["error"])
+
     return result
