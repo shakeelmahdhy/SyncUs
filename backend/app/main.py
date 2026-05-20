@@ -4,10 +4,10 @@ from fastapi.responses import JSONResponse
 import os
 
 # Import module routers
-from app.modules.jobs import router as jobs_router
-from app.modules.accounts import router as accounts_router
-from app.modules.matching import router as matching_router
-from app.modules.tracking import router as tracking_router
+from modules.jobs import router as jobs_router
+from modules.accounts import router as accounts_router
+from modules.matching import router as matching_router
+from modules.tracking import router as tracking_router
 
 
 # Application metadata
