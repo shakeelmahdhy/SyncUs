@@ -171,7 +171,7 @@ def parse_profile_data(user_id):
 # ---------------- AUTH ---------------- #
 
 def register_user(payload):
-    """Register a user with Supabase Auth and insert a profile."""
+    """Register a user with Supabase Auth and create role-based profile."""
     try:
         try:
             auth_response = supabase.auth.sign_up(
@@ -196,27 +196,45 @@ def register_user(payload):
 
         user_uuid = _to_str_id(user_id)
 
-        data = {
-            "id": user_uuid,
-            "user_id": user_uuid,
-            "first_name": payload.first_name,
-            "last_name": payload.last_name,
-            "email": payload.email,
-        }
+        if payload.role == "job_seeker":
+            data = {
+                "id": user_uuid,
+                "user_id": user_uuid,
+                "first_name": payload.first_name,
+                "last_name": payload.last_name,
+                "email": payload.email,
+            }
 
-        response = supabase.table("job_seekers").insert(data).execute()
+            response = supabase.table("job_seekers").insert(data).execute()
+
+        elif payload.role == "employer":
+            data = {
+                "id": user_uuid,
+                "company_name": f"{payload.first_name} {payload.last_name}",
+                "company_description": None,
+                "industry": None,
+                "is_verified": False,
+            }
+
+            response = supabase.table("employers").insert(data).execute()
+
+        else:
+            return {"error": "Invalid role"}
 
         if not response.data:
             return {"error": "Profile creation after registration failed"}
 
-        return response.data[0]
+        result = response.data[0]
+        result["role"] = payload.role
+
+        return result
 
     except Exception as e:
         return {"error": f"Auth registration failed: {str(e)}"}
 
 
 def login_user(payload):
-    """Authenticate a user and retrieve a valid access token."""
+    """Authenticate a user and retrieve a valid access token with role."""
     try:
         try:
             response = supabase.auth.sign_in_with_password(
@@ -234,11 +252,35 @@ def login_user(payload):
         if not access_token:
             return {"error": "Invalid credentials"}
 
+        user_id = str(response.user.id)
+        role = None
+
+        job_seeker_response = (
+            supabase.table("job_seekers")
+            .select("id")
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+        if job_seeker_response.data:
+            role = "job_seeker"
+        else:
+            employer_response = (
+                supabase.table("employers")
+                .select("id")
+                .eq("id", user_id)
+                .execute()
+            )
+
+            if employer_response.data:
+                role = "employer"
+
         return {
             "access_token": access_token,
             "user": {
-                "id": str(response.user.id),
+                "id": user_id,
                 "email": response.user.email,
+                "role": role,
             },
         }
 
