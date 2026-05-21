@@ -11,8 +11,8 @@ Breakdown of team guidance into topic-specific docs for easier lookup.
 - `docs/03_branch_migrations_linking.md`
 
 ## FastAPI + Supabase-first implementation
+- `docs/00_integration_contract.md`
 - `docs/04_fastapi_supabase_architecture.md`
 
 ## Tracking module implementation
 - `docs/05_tracking_module_order.md`
-

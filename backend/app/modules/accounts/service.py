@@ -19,13 +19,12 @@ def create_user(payload):
 
         data = {
             "id": user_uuid,
-            "user_id": user_uuid,
             "first_name": payload.first_name,
             "last_name": payload.last_name,
-            "email": payload.email,
+            "phone": payload.phone,
         }
 
-        response = _anon_supabase().table("job_seekers").insert(data).execute()
+        response = get_supabase_service_client().table("job_seekers").insert(data).execute()
         return response.data[0]
 
     except Exception as e:
@@ -158,16 +157,34 @@ def register_user(payload):
         if not user_id:
             return {"error": "Supabase signup returned no user ID"}
 
-        data = {
-            "id": str(user_id),
-            "user_id": str(user_id),
-            "first_name": payload.first_name,
-            "last_name": payload.last_name,
-            "email": payload.email,
-        }
+        service = get_supabase_service_client()
+        if payload.account_type == "employer":
+            data = {
+                "id": str(user_id),
+                "company_name": payload.company_name or f"{payload.first_name} {payload.last_name}",
+            }
+            table_name = "employers"
+        else:
+            data = {
+                "id": str(user_id),
+                "first_name": payload.first_name,
+                "last_name": payload.last_name,
+            }
+            table_name = "job_seekers"
 
-        response = sb.table("job_seekers").insert(data).execute()
-        return response.data[0]
+        response = service.table(table_name).insert(data).execute()
+        profile = response.data[0] if response.data else data
+        session = getattr(auth_response, "session", None)
+
+        return {
+            "access_token": getattr(session, "access_token", None) if session else None,
+            "user": {
+                "id": str(user_id),
+                "email": payload.email,
+                "account_type": payload.account_type,
+            },
+            "profile": profile,
+        }
 
     except Exception as e:
         return {"error": f"Auth registration failed: {str(e)}"}

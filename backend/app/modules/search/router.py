@@ -82,6 +82,7 @@ async def search_jobs(
     ),
 )
 async def filter_candidates(
+    current_employer: EmployerUserDep,
     skills: Optional[str] = Query(None, description="Comma-separated skill tags, e.g. react,python"),
     education_level: Optional[str] = Query(None, description="any | bachelor | master | phd"),
     major: Optional[str] = Query(None, description="Field of study, e.g. Computer Science"),
@@ -91,7 +92,6 @@ async def filter_candidates(
     sort_by: Optional[str] = Query("relevance", description="relevance | newest | oldest"),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
-    current_employer: EmployerUserDep,
     search_service: SearchService = Depends(get_search_service),
 ) -> CandidateFilterResponse:
     """

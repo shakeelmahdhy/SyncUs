@@ -15,12 +15,12 @@ Follow after [04_fastapi_supabase_architecture.md](04_fastapi_supabase_architect
 
 1. **`.env.example` and local `.env`**
    - `SUPABASE_URL`
-   - `SUPABASE_SERVICE_ROLE_KEY` — backend only; used to build the server `Client`.
-   - `SUPABASE_JWT_SECRET` (or the exact name you choose) — value from Supabase **Project Settings → API → JWT Secret** (for default HS256 access tokens). If the project uses asymmetric JWTs, follow Supabase docs and verify with JWKS instead of a single secret.
-   - Keep `SUPABASE_ANON_KEY` documented for **clients** / local PostgREST; do not use anon as the BFF’s privileged client for Option A.
+   - `SUPABASE_PUBLISHABLE_KEY` — publishable Supabase API key.
+   - `SUPABASE_SECRET_KEY` — backend only; used to build the server `Client`.
+   - `SUPABASE_JWT_SECRET` — value from Supabase **Project Settings → API → JWT Secret** (for default HS256 access tokens). If the project uses asymmetric JWTs, follow Supabase docs and verify with JWKS instead of a single secret.
 
 2. **Align code with variable names**
-   - Replace ambiguous names such as `SUPABASE_KEY` with **`SUPABASE_SERVICE_ROLE_KEY`** (or one clearly documented alias) wherever `create_client` is called for **FastAPI** data access.
+   - Replace ambiguous names such as `SUPABASE_KEY` with **`SUPABASE_SECRET_KEY`** wherever `create_client` is called for **FastAPI** data access.
    - Fail fast at startup if service role or JWT secret is missing in environments where protected routes run.
 
 3. **Optional:** `python-dotenv` loading from `backend/.env` in `main` or a small `settings` module so local runs match production’s explicit env injection.

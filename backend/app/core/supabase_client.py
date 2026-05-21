@@ -11,8 +11,7 @@ Two clients are exposed:
   Required for Option A: bypasses RLS, so callers MUST scope every query
   by the authenticated user (`sub`) in code.
 
-- `get_supabase_publishable_client()` — uses SUPABASE_PUBLISHABLE_KEY, or
-  legacy SUPABASE_ANON_KEY if unset.
+- `get_supabase_publishable_client()` — uses SUPABASE_PUBLISHABLE_KEY.
 
 Both clients are created lazily and cached as module-level singletons.
 """
@@ -58,16 +57,13 @@ def _require_env(name: str) -> str:
 
 
 def _publishable_key() -> str:
-    """Resolve anon / publishable API key (new name preferred, legacy anon supported)."""
+    """Resolve the canonical publishable API key."""
     key = (os.environ.get("SUPABASE_PUBLISHABLE_KEY") or "").strip()
     if key:
         return key
-    legacy = (os.environ.get("SUPABASE_ANON_KEY") or "").strip()
-    if legacy:
-        return legacy
     raise RuntimeError(
-        "Missing Supabase anon/publishable key: set SUPABASE_PUBLISHABLE_KEY "
-        "or SUPABASE_ANON_KEY in backend/.env (see backend/.env.example)."
+        "Missing Supabase publishable key: set SUPABASE_PUBLISHABLE_KEY "
+        "in backend/.env (see backend/.env.example)."
     )
 
 
@@ -83,7 +79,7 @@ def get_supabase_service_client():
 
 
 def get_supabase_publishable_client():
-    """Return a process-wide Supabase client built with the publishable/anon key."""
+    """Return a process-wide Supabase client built with the publishable key."""
     global _publishable_client
     if _publishable_client is None:
         url = _require_env("SUPABASE_URL")
