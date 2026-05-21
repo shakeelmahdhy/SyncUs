@@ -31,7 +31,6 @@ def create_user(payload):
             "skills": payload.skills,
             "preferred_working_mode": payload.preferred_working_mode,
             "preferred_location": payload.preferred_location,
-        
         }
 
         response = supabase.table("job_seekers").insert(data).execute()
@@ -255,8 +254,10 @@ def login_user(payload):
         user_id = str(response.user.id)
         role = None
 
+        service_supabase = get_supabase_service_client()
+
         job_seeker_response = (
-            supabase.table("job_seekers")
+            service_supabase.table("job_seekers")
             .select("id")
             .eq("user_id", user_id)
             .execute()
@@ -266,7 +267,7 @@ def login_user(payload):
             role = "job_seeker"
         else:
             employer_response = (
-                supabase.table("employers")
+                service_supabase.table("employers")
                 .select("id")
                 .eq("id", user_id)
                 .execute()
