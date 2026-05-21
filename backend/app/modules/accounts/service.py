@@ -194,6 +194,7 @@ def register_user(payload):
             return {"error": "Supabase signup returned no user ID"}
 
         user_uuid = _to_str_id(user_id)
+        service_supabase = get_supabase_service_client()
 
         if payload.role == "job_seeker":
             data = {
@@ -204,7 +205,7 @@ def register_user(payload):
                 "email": payload.email,
             }
 
-            response = supabase.table("job_seekers").insert(data).execute()
+            response = service_supabase.table("job_seekers").insert(data).execute()
 
         elif payload.role == "employer":
             data = {
@@ -215,7 +216,7 @@ def register_user(payload):
                 "is_verified": False,
             }
 
-            response = supabase.table("employers").insert(data).execute()
+            response = service_supabase.table("employers").insert(data).execute()
 
         else:
             return {"error": "Invalid role"}
