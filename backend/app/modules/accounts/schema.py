@@ -86,4 +86,3 @@ class LoginRequest(BaseModel):
     password: str
 
 
-
