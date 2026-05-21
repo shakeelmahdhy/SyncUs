@@ -20,8 +20,7 @@ class UserCreateRequest(BaseModel):
     preferred_working_mode: Optional[str] = None
     preferred_location: Optional[str] = None
 
-    # Membership feature
-    membership: bool = False
+    
 
 
 class UserResponse(BaseModel):
@@ -40,7 +39,7 @@ class UserResponse(BaseModel):
     preferred_working_mode: Optional[str] = None
     preferred_location: Optional[str] = None
 
-    membership: Optional[bool] = False
+    
 
 
 class UserUpdateRequest(BaseModel):
@@ -56,7 +55,7 @@ class UserUpdateRequest(BaseModel):
     preferred_working_mode: Optional[str] = None
     preferred_location: Optional[str] = None
 
-    membership: Optional[bool] = None
+   
 
 
 # -------- RESUME --------
