@@ -1,4 +1,35 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+const defaultApiBaseUrl =
+  typeof window !== "undefined"
+    ? `${window.location.protocol}//${window.location.hostname}:8000`
+    : "http://127.0.0.1:8000";
+const API_BASE_URL = ((import.meta as unknown) as { env: { VITE_API_BASE_URL?: string } }).env.VITE_API_BASE_URL ?? defaultApiBaseUrl;
+const AUTH_TOKEN_KEY = "syncus_access_token";
+
+export function getStoredAccessToken() {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(AUTH_TOKEN_KEY);
+}
+
+export function storeAccessToken(token: string) {
+  window.localStorage.setItem(AUTH_TOKEN_KEY, token);
+}
+
+function getJwtSub(token: string | null) {
+  if (!token) return null;
+
+  try {
+    const [, payload] = token.split(".");
+    const normalizedPayload = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const paddedPayload = normalizedPayload.padEnd(
+      normalizedPayload.length + ((4 - (normalizedPayload.length % 4)) % 4),
+      "="
+    );
+    const decoded = JSON.parse(window.atob(paddedPayload)) as { sub?: string };
+    return decoded.sub ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export interface AccountProfile {
   id: number;
@@ -20,9 +51,11 @@ export interface AccountProfile {
 export type AccountProfileUpdate = Omit<AccountProfile, "id">;
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getStoredAccessToken();
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init?.headers,
     },
     ...init,
@@ -37,13 +70,49 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export function getAccountProfile() {
-  return request<AccountProfile>("/skill-sync/v1/accounts/me");
+  const userId = getJwtSub(getStoredAccessToken());
+  if (!userId) {
+    return Promise.reject(new Error("No authenticated user"));
+  }
+  return request<AccountProfile>(`/accounts/profile/${userId}`);
 }
 
 export function updateAccountProfile(profile: AccountProfileUpdate) {
-  return request<AccountProfile>("/skill-sync/v1/accounts/me", {
-    method: "PUT",
+  const userId = getJwtSub(getStoredAccessToken());
+  if (!userId) {
+    return Promise.reject(new Error("No authenticated user"));
+  }
+  return request<AccountProfile>(`/accounts/profile/${userId}`, {
+    method: "PATCH",
     body: JSON.stringify(profile),
+  });
+}
+
+export type AccountType = "job_seeker" | "employer";
+
+export interface RegisterAccountPayload {
+  first_name: string;
+  last_name: string;
+  email: string;
+  password: string;
+  account_type: AccountType;
+  company_name?: string;
+}
+
+export interface RegisterAccountResponse {
+  access_token: string | null;
+  user: {
+    id: string;
+    email: string;
+    account_type: AccountType;
+  };
+  profile: Record<string, unknown>;
+}
+
+export function registerAccount(payload: RegisterAccountPayload) {
+  return request<RegisterAccountResponse>("/accounts/auth/register", {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }
 
@@ -104,9 +173,9 @@ export function searchJobs(params: JobSearchParams = {}) {
   if (params.page_size) searchParams.set("page_size", String(params.page_size));
 
   const query = searchParams.toString();
-  return request<JobListResponse>(`/skill-sync/v1/jobs${query ? `?${query}` : ""}`);
+  return request<JobListResponse>(`/jobs${query ? `?${query}` : ""}`);
 }
 
 export function getJob(jobId: string) {
-  return request<BackendJob>(`/skill-sync/v1/jobs/${jobId}`);
+  return request<BackendJob>(`/jobs/${jobId}`);
 }

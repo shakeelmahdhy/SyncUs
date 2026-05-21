@@ -6,10 +6,10 @@ import { ApplicationsPage } from './pages/ApplicationsPage';
 import { JobDetailPage } from './pages/JobsDetailPage';
 import { LandingPage } from './pages/LandingPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { RegistrationPage } from './pages/RegistrationPage';
 import { SiteFooter, SiteNav } from './shared/components';
 import TalentPoolPage from './pages/TalentPoolPage';
 import DashboardPage from './pages/DashboardPage';
-import { HiringTeamPage } from './pages/employer/HiringTeamPage';
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
@@ -20,9 +20,9 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/applications" element={<ApplicationsPage />} />
           <Route path="/jobs/:id" element={<JobDetailPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/register" element={<RegistrationPage />} />
           <Route path="/talent-pool" element={<TalentPoolPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/hiring-team" element={<HiringTeamPage />} />
           <Route path="*" element={<LandingPage />} />
         </Routes>
         <SiteFooter />

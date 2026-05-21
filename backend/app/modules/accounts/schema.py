@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from uuid import UUID
-from typing import Optional
+from typing import Literal, Optional
 
 
 # -------- USER / JOB SEEKER --------
@@ -48,9 +48,10 @@ class RegisterRequest(BaseModel):
     last_name: str
     email: EmailStr
     password: str
+    account_type: Literal["job_seeker", "employer"] = "job_seeker"
+    company_name: Optional[str] = None
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
-

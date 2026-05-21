@@ -3,5 +3,8 @@ uvicorn
 supabase
 python-dotenv
 pyjwt
-
+python-multipart
+pydantic
 pytest
+email-validator
+pytest-asyncio
