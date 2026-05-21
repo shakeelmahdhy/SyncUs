@@ -47,6 +47,23 @@ class JobService:
             return response.data[0]["company_name"]
         return "Employer"
 
+    def _applications_count_for(self, job_id: UUID | str) -> int:
+        """Count tracking applications for a job."""
+        response = (
+            self.db.table("applications")
+            .select("id", count="exact")
+            .eq("job_id", str(job_id))
+            .execute()
+        )
+        return int(response.count or 0)
+
+    def _row_to_job(self, row: dict, *, company_name: str = "Employer") -> Job:
+        return row_to_job(
+            row,
+            company_name=company_name,
+            applications_count=self._applications_count_for(row["id"]),
+        )
+
     async def create_job(self, job_data: JobCreate, employer_id: UUID) -> Job:
         """Create a new job posting (DRAFT)."""
         try:
@@ -60,7 +77,7 @@ class JobService:
                 )
 
             row = response.data[0]
-            return row_to_job(row, company_name=self._company_name_for(employer_id))
+            return self._row_to_job(row, company_name=self._company_name_for(employer_id))
 
         except HTTPException:
             raise
@@ -97,7 +114,7 @@ class JobService:
                 row["views_count"] = row.get("views_count", 0) + 1
 
             emp_id = UUID(row["employer_id"])
-            return row_to_job(row, company_name=self._company_name_for(emp_id))
+            return self._row_to_job(row, company_name=self._company_name_for(emp_id))
 
         except HTTPException:
             raise
@@ -138,7 +155,7 @@ class JobService:
                     detail="Failed to update job posting",
                 )
 
-            return row_to_job(
+            return self._row_to_job(
                 response.data[0], company_name=self._company_name_for(employer_id)
             )
 
@@ -279,7 +296,7 @@ class JobService:
             jobs: List[Job] = []
             for row in response.data or []:
                 emp_id = UUID(row["employer_id"])
-                jobs.append(row_to_job(row, company_name=self._company_name_for(emp_id)))
+                jobs.append(self._row_to_job(row, company_name=self._company_name_for(emp_id)))
 
             return JobListResponse(
                 jobs=jobs,
@@ -326,7 +343,7 @@ class JobService:
             total_pages = (total + page_size - 1) // page_size
             company = self._company_name_for(employer_id)
 
-            jobs = [row_to_job(row, company_name=company) for row in (response.data or [])]
+            jobs = [self._row_to_job(row, company_name=company) for row in (response.data or [])]
 
             return JobListResponse(
                 jobs=jobs,
