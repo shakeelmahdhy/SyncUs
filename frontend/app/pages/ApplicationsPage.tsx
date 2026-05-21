@@ -5,43 +5,63 @@ import {
   CheckCircle,
   ChevronRight,
   Clock,
-  Eye,
   XCircle,
 } from "lucide-react";
 import { useNavigate } from "react-router";
-import { applications } from "../data/mockData";
-import type { Application } from "../data/mockData";
-import { readStoredApplications } from "../lib/jobs";
+import { listApplications, searchJobs } from "../lib/api";
+import { type Application, toFrontendApplication, toFrontendJob } from "../lib/jobs";
 
 const statusConfig: Record<
   Application["status"],
   { label: string; color: string; bg: string; icon: typeof CheckCircle }
 > = {
   Applied: { label: "Applied", color: "#1e4890", bg: "#e5eceb", icon: Clock },
-  Viewed: { label: "Viewed", color: "#00804d", bg: "#e1f0df", icon: Eye },
   Shortlisted: { label: "Shortlisted", color: "#d39000", bg: "#f5eed9", icon: CheckCircle },
   Interviewing: { label: "Interviewing", color: "#7c3aed", bg: "#eee1f8", icon: CalendarDays },
   Rejected: { label: "Rejected", color: "#dc2626", bg: "#f8dddd", icon: XCircle },
   Withdrawn: { label: "Withdrawn", color: "#6b7280", bg: "#e8e8e8", icon: AlertCircle },
 };
 
-const filterTabs = ["All", "Applied", "Viewed", "Shortlisted", "Interviewing", "Rejected"] as const;
+const filterTabs = ["All", "Applied", "Shortlisted", "Interviewing", "Rejected"] as const;
 type FilterTab = (typeof filterTabs)[number];
 
-const inProgressStatuses: Application["status"][] = ["Applied", "Viewed", "Shortlisted", "Interviewing"];
+const inProgressStatuses: Application["status"][] = ["Applied", "Shortlisted", "Interviewing"];
 
 export function ApplicationsPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<FilterTab>("All");
-  const [trackedApplications, setTrackedApplications] = useState<Application[]>(applications);
+  const [trackedApplications, setTrackedApplications] = useState<Application[]>([]);
+  const [loadingApplications, setLoadingApplications] = useState(true);
+  const [applicationsError, setApplicationsError] = useState<string | null>(null);
 
   useEffect(() => {
-    const stored = readStoredApplications();
-    const storedIds = new Set(stored.map((application) => String(application.jobId)));
-    setTrackedApplications([
-      ...stored,
-      ...applications.filter((application) => !storedIds.has(String(application.jobId))),
-    ]);
+    let isMounted = true;
+
+    Promise.all([listApplications(), searchJobs({ page_size: 100 })])
+      .then(([applicationResponse, jobResponse]) => {
+        if (!isMounted) return;
+        const jobsById = new Map(jobResponse.jobs.map((job) => [job.job_id, toFrontendJob(job)]));
+        setTrackedApplications(
+          applicationResponse.items.map((application) =>
+            toFrontendApplication(application, jobsById.get(application.job_id))
+          )
+        );
+        setApplicationsError(null);
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        setTrackedApplications([]);
+        setApplicationsError(error instanceof Error ? error.message : "Applications could not be loaded.");
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoadingApplications(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const filtered =
@@ -90,8 +110,13 @@ export function ApplicationsPage() {
             My Applications
           </h1>
           <p className="mt-3 text-base font-medium text-syncus-blue/55 sm:text-lg">
-            Track the progress of all your submitted applications
+            {loadingApplications ? "Loading your applications..." : "Track the progress of all your submitted applications"}
           </p>
+          {applicationsError && (
+            <p className="mt-2 text-sm font-bold text-red-600">
+              {applicationsError}
+            </p>
+          )}
         </header>
 
         <div className="mb-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -144,7 +169,9 @@ export function ApplicationsPage() {
         <div className="grid gap-4">
           {filtered.length === 0 ? (
             <section className="rounded-2xl border-2 border-dashed border-syncus-blue/15 py-12 text-center">
-              <p className="text-lg font-bold text-syncus-blue/55">No {activeTab.toLowerCase()} applications</p>
+              <p className="text-lg font-bold text-syncus-blue/55">
+                {applicationsError ? "Applications are unavailable" : `No ${activeTab.toLowerCase()} applications`}
+              </p>
             </section>
           ) : (
             filtered.map((application) => {

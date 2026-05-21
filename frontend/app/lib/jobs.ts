@@ -1,7 +1,38 @@
-import type { Application, Job } from "../data/mockData";
-import type { BackendJob, WorkMode } from "./api";
+import type { ApplicationStatus, BackendJob, SearchJobResult, TrackingApplication, WorkMode } from "./api";
 
-const applicationStorageKey = "syncus.applications";
+export interface Job {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  types: string[];
+  respondsWithin: string;
+  description: string;
+  fullDescription: string;
+  requirements: string[];
+  recommended: boolean;
+  postedDate: string;
+  salary: string;
+  experience: string;
+  matchScore: number;
+  applicants: number;
+  interviews: number;
+  skills: string[];
+  category: string;
+  workType: "Full-Time";
+  locationMode: "Remote" | "On-site" | "Hybrid";
+}
+
+export interface Application {
+  id: string;
+  jobId: string;
+  title: string;
+  company: string;
+  location: string;
+  status: "Applied" | "Interviewing" | "Shortlisted" | "Rejected" | "Withdrawn";
+  appliedDate: string;
+  matchScore: number;
+}
 
 const workModeLabels: Record<WorkMode, Job["locationMode"]> = {
   remote: "Remote",
@@ -115,40 +146,61 @@ export function toFrontendJob(job: BackendJob): Job {
   };
 }
 
-export function readStoredApplications(): Application[] {
-  try {
-    const raw = window.localStorage.getItem(applicationStorageKey);
-    return raw ? (JSON.parse(raw) as Application[]) : [];
-  } catch {
-    return [];
-  }
+export function toFrontendSearchJob(job: SearchJobResult): Job {
+  const skills = job.required_skills.map(titleCaseSkill);
+  const locationMode = job.work_mode ? workModeLabels[job.work_mode] : "Hybrid";
+  const category = inferCategory({
+    title: job.title,
+    description: "",
+    required_skills: job.required_skills,
+  } as BackendJob);
+
+  return {
+    id: job.job_id,
+    title: job.title,
+    company: job.company_name,
+    location: job.location,
+    types: [locationMode, "Full-Time"],
+    respondsWithin: "<3 days",
+    description: skills.length ? `Required skills: ${skills.join(", ")}` : "Open role from SyncUs jobs search.",
+    fullDescription: "Open role from SyncUs jobs search. View the role for the full job description.",
+    requirements: skills.map((skill) => `Experience with ${skill}`),
+    recommended: false,
+    postedDate: job.published_at ? formatPostedDate(job.published_at) : "Recently posted",
+    salary: "Salary not listed",
+    experience: "Any experience",
+    matchScore: Math.min(98, 70 + Math.max(0, skills.length * 4)),
+    applicants: job.applications_count,
+    interviews: Math.floor(job.applications_count * 0.12),
+    skills,
+    category,
+    workType: "Full-Time",
+    locationMode,
+  };
 }
 
-export function storeApplication(job: Job, resume: string, notes: string) {
-  const current = readStoredApplications();
-  const existing = current.find((application) => String(application.jobId) === String(job.id));
+const applicationStatusLabels: Record<ApplicationStatus, Application["status"]> = {
+  applied: "Applied",
+  shortlisted: "Shortlisted",
+  interview: "Interviewing",
+  offered: "Shortlisted",
+  rejected: "Rejected",
+  withdrawn: "Withdrawn",
+};
 
-  if (existing) {
-    return existing;
-  }
-
-  const application: Application = {
-    id: Date.now(),
-    jobId: job.id,
-    title: job.title,
-    company: job.company,
-    location: job.location,
-    status: "Applied",
-    appliedDate: new Date().toLocaleDateString("en-AU", {
+export function toFrontendApplication(application: TrackingApplication, job?: Job): Application {
+  return {
+    id: application.id,
+    jobId: application.job_id,
+    title: job?.title ?? `Job ${application.job_id.slice(0, 8)}`,
+    company: job?.company ?? "Employer",
+    location: job?.location ?? "Location unavailable",
+    status: applicationStatusLabels[application.status],
+    appliedDate: new Date(application.created_at).toLocaleDateString("en-AU", {
       month: "short",
       day: "numeric",
       year: "numeric",
     }),
-    matchScore: job.matchScore,
-    resume,
-    notes,
+    matchScore: job?.matchScore ?? 0,
   };
-
-  window.localStorage.setItem(applicationStorageKey, JSON.stringify([application, ...current]));
-  return application;
 }

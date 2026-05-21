@@ -82,7 +82,12 @@ def job_update_to_row(job_data: JobUpdate) -> dict[str, Any]:
     return patch
 
 
-def row_to_job(row: dict[str, Any], *, company_name: str = "Employer") -> Job:
+def row_to_job(
+    row: dict[str, Any],
+    *,
+    company_name: str = "Employer",
+    applications_count: int | None = None,
+) -> Job:
     """Build API ``Job`` from a ``public.jobs`` row."""
     created = _parse_ts(row.get("created_at"))
     status_raw = row.get("status") or JobStatus.DRAFT.value
@@ -116,7 +121,11 @@ def row_to_job(row: dict[str, Any], *, company_name: str = "Employer") -> Job:
         website=None,
         status=status,
         views_count=0,
-        applications_count=0,
+        applications_count=(
+            applications_count
+            if applications_count is not None
+            else int(row.get("applications_count") or 0)
+        ),
         created_at=created,
         updated_at=created,
         published_at=published_at,

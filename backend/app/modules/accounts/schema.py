@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from uuid import UUID
 from typing import Literal, Optional
 
@@ -20,12 +20,38 @@ class UserResponse(BaseModel):
     last_name: str
     email: Optional[EmailStr] = None
     user_id: Optional[UUID] = None   
+    phone: Optional[str] = None
+    location: Optional[str] = None
+    title: Optional[str] = None
+    experience: Optional[str] = None
+    bio: Optional[str] = None
+    linkedin: Optional[str] = None
+    portfolio: Optional[str] = None
+    education: Optional[str] = None
+    company: Optional[str] = None
+    skills: list[str] = Field(default_factory=list)
+    major: Optional[str] = None
+    years_of_experience: Optional[int] = None
+    academic_units: list[str] = Field(default_factory=list)
 
 
 class UserUpdateRequest(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    location: Optional[str] = None
+    title: Optional[str] = None
+    experience: Optional[str] = None
+    bio: Optional[str] = None
+    linkedin: Optional[str] = None
+    portfolio: Optional[str] = None
+    education: Optional[str] = None
+    company: Optional[str] = None
+    skills: Optional[list[str]] = None
+    major: Optional[str] = None
+    years_of_experience: Optional[int] = None
+    academic_units: Optional[list[str]] = None
 
 
 # -------- RESUME --------

@@ -102,6 +102,20 @@ def select_application_for_user(
     return rows[0] if rows else None  # type: ignore[return-value]
 
 
+def select_application_by_id(application_id: UUID) -> ApplicationRow | None:
+    """Return one application row by id without applying owner rules."""
+    client = get_supabase_service_client()
+    response = (
+        client.table(_TABLE)
+        .select("*")
+        .eq("id", str(application_id))
+        .limit(1)
+        .execute()
+    )
+    rows = response.data or []
+    return rows[0] if rows else None  # type: ignore[return-value]
+
+
 def update_application_status_for_user(
     application_id: UUID,
     user_id: UUID,
@@ -122,6 +136,22 @@ def update_application_status_for_user(
         .update({"status": new_status})
         .eq("id", str(application_id))
         .eq("job_seeker_id", str(user_id))
+        .execute()
+    )
+    rows = response.data or []
+    return rows[0] if rows else None  # type: ignore[return-value]
+
+
+def update_application_status_by_id(
+    application_id: UUID,
+    new_status: ApplicationStatus,
+) -> ApplicationRow | None:
+    """Update application status after service-layer authorization."""
+    client = get_supabase_service_client()
+    response = (
+        client.table(_TABLE)
+        .update({"status": new_status})
+        .eq("id", str(application_id))
         .execute()
     )
     rows = response.data or []

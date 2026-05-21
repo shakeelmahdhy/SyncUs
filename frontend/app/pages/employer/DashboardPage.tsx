@@ -10,18 +10,7 @@ import {
   type CandidateRecommendation,
   type JobStatsResponse,
 } from "../../lib/api";
-import { jobs as sampleJobs } from "../../data/mockData";
 import { EmployerShell } from "./EmployerShell";
-
-const fallbackJobs = sampleJobs.slice(0, 3).map((job) => ({
-  job_id: String(job.id),
-  title: job.title,
-  company_name: job.company,
-  location: job.location,
-  applications_count: job.applicants,
-  views_count: job.applicants * 3,
-  status: "published",
-})) as Pick<BackendJob, "job_id" | "title" | "company_name" | "location" | "applications_count" | "views_count" | "status">[];
 
 function StatCard({ icon: Icon, label, value, hint }: { icon: typeof BriefcaseBusiness; label: string; value: string | number; hint?: string }) {
   return (
@@ -38,7 +27,7 @@ function StatCard({ icon: Icon, label, value, hint }: { icon: typeof BriefcaseBu
 
 export function EmployerDashboardPage() {
   const navigate = useNavigate();
-  const [jobs, setJobs] = useState(fallbackJobs);
+  const [jobs, setJobs] = useState<BackendJob[]>([]);
   const [stats, setStats] = useState<JobStatsResponse | null>(null);
   const [candidateMatches, setCandidateMatches] = useState<Record<string, CandidateRecommendation[]>>({});
   const [interviewCount, setInterviewCount] = useState(0);
@@ -78,9 +67,11 @@ export function EmployerDashboardPage() {
           );
         }
       })
-      .catch(() => {
+      .catch((error) => {
         if (!isMounted) return;
-        setNotice("Showing sample dashboard data until employer APIs are available.");
+        setJobs([]);
+        setStats(null);
+        setNotice(error instanceof Error ? error.message : "Employer APIs are unavailable.");
       });
 
     return () => {
@@ -95,7 +86,7 @@ export function EmployerDashboardPage() {
       .flat()
       .map((candidate) => Math.round(candidate.score * 100));
 
-    if (scores.length === 0) return 94;
+    if (scores.length === 0) return 0;
     return Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length);
   }, [candidateMatches]);
 
@@ -109,7 +100,7 @@ export function EmployerDashboardPage() {
           <p className="mt-4 text-base font-medium text-syncus-blue">
             Welcome back, John. Here is what is happening with your hiring pipeline today.
           </p>
-          {notice && <p className="mt-2 text-sm font-bold text-syncus-green">{notice}</p>}
+          {notice && <p className="mt-2 text-sm font-bold text-red-600">{notice}</p>}
         </div>
         <div className="flex flex-wrap gap-3">
           <button className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-syncus-green px-4 text-xs font-black uppercase text-syncus-cream" type="button">
@@ -126,7 +117,7 @@ export function EmployerDashboardPage() {
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={BriefcaseBusiness} label="Active Postings" value={stats?.published_count ?? activeJobs.length} />
         <StatCard icon={Users} label="Total Applicants" value={applicants} />
-        <StatCard icon={Star} label="Shortlisted" value={Math.max(0, applicants ? Math.round(applicants * 0.2) : 84)} />
+        <StatCard icon={Star} label="Shortlisted" value={Math.max(0, applicants ? Math.round(applicants * 0.2) : 0)} />
         <StatCard icon={Bot} label="AI Match Score" value={`${averageMatch}%`} hint="Avg. match quality across active roles" />
       </section>
 
@@ -135,6 +126,14 @@ export function EmployerDashboardPage() {
           Active Job Postings ({activeJobs.length || jobs.length})
         </h2>
         <div className="mt-5 grid gap-4">
+          {(activeJobs.length ? activeJobs : jobs).length === 0 && (
+            <div className="rounded-[18px] border-2 border-dashed border-syncus-blue/35 px-6 py-12 text-center">
+              <p className="text-xl font-black">No employer jobs found.</p>
+              <p className="mt-2 text-sm font-bold text-syncus-blue/55">
+                Create a job after logging in with an employer account.
+              </p>
+            </div>
+          )}
           {(activeJobs.length ? activeJobs : jobs).slice(0, 3).map((job) => {
             const topMatch = candidateMatches[job.job_id]?.[0];
             return (
@@ -181,7 +180,11 @@ export function EmployerDashboardPage() {
       <section className="mt-10 max-w-[520px] rounded-[18px] border-2 border-syncus-blue bg-syncus-cream p-7">
         <h2 className="font-serif text-3xl leading-none">Upcoming Interviews</h2>
         <div className="mt-5 grid gap-3">
-          {[0, 1].map((item) => (
+          {interviewCount === 0 ? (
+            <p className="rounded-xl border-2 border-dashed border-syncus-blue/25 px-4 py-5 text-sm font-bold text-syncus-blue/55">
+              No live interview applications yet.
+            </p>
+          ) : [0, 1].slice(0, interviewCount).map((item) => (
             <article key={item} className="flex min-h-16 items-center gap-4 rounded-xl border-2 border-syncus-blue px-4">
               <span className="grid h-11 w-11 place-items-center rounded-lg bg-syncus-blue/15 text-xs font-black text-syncus-blue">
                 OCT<br />24

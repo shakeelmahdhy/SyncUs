@@ -11,7 +11,6 @@ import {
   type CandidateRecommendation,
   type TrackingApplication,
 } from "../../lib/api";
-import { applications as sampleApplications, candidates as sampleCandidates, jobs as sampleJobs } from "../../data/mockData";
 import { EmployerShell } from "./EmployerShell";
 
 const statusLabels: Record<ApplicationStatus, string> = {
@@ -36,16 +35,6 @@ interface ApplicationRow {
   createdAt: string;
   matchScore: number;
 }
-
-const fallbackJobs = sampleJobs.slice(0, 3).map((job) => ({
-  job_id: String(job.id),
-  title: job.title,
-  company_name: job.company,
-  location: job.location,
-  applications_count: job.applicants,
-  views_count: job.applicants * 3,
-  status: "published",
-})) as Pick<BackendJob, "job_id" | "title" | "company_name" | "location" | "applications_count" | "views_count" | "status">[];
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString("en-AU", { month: "short", day: "numeric", year: "numeric" });
@@ -75,29 +64,11 @@ function buildRows(
   });
 }
 
-function sampleRows(): ApplicationRow[] {
-  return sampleApplications.slice(0, 5).map((application, index) => {
-    const candidate = sampleCandidates[index] ?? sampleCandidates[0];
-    const status = application.status.toLowerCase() === "interviewing" ? "interview" : application.status.toLowerCase();
-    return {
-      id: String(application.id),
-      jobId: String(application.jobId),
-      jobTitle: application.title,
-      candidateId: String(candidate.id),
-      candidateName: candidate.name,
-      skills: candidate.skills,
-      status: status as ApplicationStatus,
-      createdAt: new Date().toISOString(),
-      matchScore: candidate.matchScore,
-    };
-  });
-}
-
 export function EmployerReviewApplicationsPage() {
   const location = useLocation();
   const initialJobId = (location.state as { jobId?: string } | null)?.jobId ?? "all";
-  const [jobs, setJobs] = useState(fallbackJobs);
-  const [rows, setRows] = useState<ApplicationRow[]>(sampleRows);
+  const [jobs, setJobs] = useState<BackendJob[]>([]);
+  const [rows, setRows] = useState<ApplicationRow[]>([]);
   const [selectedJobId, setSelectedJobId] = useState(initialJobId);
   const [query, setQuery] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
@@ -134,9 +105,11 @@ export function EmployerReviewApplicationsPage() {
         setRows(buildRows(liveJobs, pipelines, matches));
         setNotice(null);
       })
-      .catch(() => {
+      .catch((error) => {
         if (!isMounted) return;
-        setNotice("Showing sample applicant data until jobs, tracking, and matching APIs are available.");
+        setJobs([]);
+        setRows([]);
+        setNotice(error instanceof Error ? error.message : "Jobs, tracking, or matching APIs are unavailable.");
       });
 
     return () => {
@@ -163,11 +136,8 @@ export function EmployerReviewApplicationsPage() {
         current.map((row) => (row.id === applicationId ? { ...row, status } : row))
       );
       setNotice(null);
-    } catch {
-      setRows((current) =>
-        current.map((row) => (row.id === applicationId ? { ...row, status } : row))
-      );
-      setNotice("Status changed locally. Backend update needs an authenticated employer session.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Application status could not be updated.");
     } finally {
       setUpdatingId(null);
     }
@@ -189,7 +159,7 @@ export function EmployerReviewApplicationsPage() {
           <p className="mt-4 text-base font-medium text-syncus-blue/68">
             Review tracking pipeline applications with AI match context from the matching module.
           </p>
-          {notice && <p className="mt-2 text-sm font-bold text-syncus-green">{notice}</p>}
+          {notice && <p className="mt-2 text-sm font-bold text-red-600">{notice}</p>}
         </div>
         <label className="flex min-h-12 w-full max-w-[360px] items-center gap-3 rounded-lg border-2 border-syncus-blue/30 px-4">
           <Search size={18} />

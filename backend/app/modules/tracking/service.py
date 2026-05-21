@@ -15,10 +15,12 @@ from fastapi import HTTPException, status
 from .mapping import application_row_to_response
 from .repository import (
     insert_application,
+    select_application_by_id,
     select_application_for_user,
     select_applications_by_user,
     select_applications_for_job,
     select_job_employer_id,
+    update_application_status_by_id,
     update_application_status_for_user,
 )
 from .schema import (
@@ -69,28 +71,57 @@ def update_application_status(
     new_status: ApplicationStatus,
 ) -> ApplicationStatusUpdateResponse:
     """
-    Update application status when owned by ``user_id`` and transition is allowed.
+    Update application status when ``user_id`` is the seeker that owns the
+    application or the employer that owns the job.
 
     Raises:
-        HTTPException: 404 when not found / not owned; 400 when transition is invalid.
+        HTTPException: 404 when not found; 403 when not authorized; 400 when
+        transition is invalid.
     """
-    existing = select_application_for_user(application_id, user_id)
+    existing = select_application_by_id(application_id)
     if existing is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Application not found",
         )
 
+    is_seeker_owner = UUID(existing["job_seeker_id"]) == user_id
+    employer_id = select_job_employer_id(UUID(existing["job_id"]))
+    is_employer_owner = employer_id == user_id
+
+    if not is_seeker_owner and not is_employer_owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to update this application",
+        )
+
     current_status: ApplicationStatus = existing["status"]
+    if is_seeker_owner and not is_employer_owner and new_status not in {
+        current_status,
+        "withdrawn",
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Job seekers can only withdraw their own applications",
+        )
+    if is_employer_owner and not is_seeker_owner and new_status == "withdrawn":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only job seekers can withdraw applications",
+        )
+
     if not can_transition(current_status, new_status):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot transition from '{current_status}' to '{new_status}'",
         )
 
-    updated = update_application_status_for_user(
-        application_id, user_id, new_status
-    )
+    if is_seeker_owner and not is_employer_owner:
+        updated = update_application_status_for_user(
+            application_id, user_id, new_status
+        )
+    else:
+        updated = update_application_status_by_id(application_id, new_status)
     if updated is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

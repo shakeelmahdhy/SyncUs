@@ -11,29 +11,27 @@ import {
   Star,
   Zap,
 } from "lucide-react";
-import { jobs } from "../data/mockData";
-import type { Job } from "../data/mockData";
-import { getJob, searchJobs } from "../lib/api";
-import { storeApplication, toFrontendJob } from "../lib/jobs";
+import { createApplication, getJob, searchJobs } from "../lib/api";
+import { type Job, toFrontendJob } from "../lib/jobs";
 import { SyncUsMark } from "../shared/components";
 
 export function JobDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [job, setJob] = useState<Job | null>(null);
-  const [allJobs, setAllJobs] = useState<Job[]>(jobs);
+  const [allJobs, setAllJobs] = useState<Job[]>([]);
   const [loadingJob, setLoadingJob] = useState(true);
   const [jobError, setJobError] = useState<string | null>(null);
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submittingApplication, setSubmittingApplication] = useState(false);
+  const [applicationError, setApplicationError] = useState<string | null>(null);
   const [coverLetter, setCoverLetter] = useState("");
-  const [selectedResume, setSelectedResume] = useState("Product_Designer_Resume_v3.pdf");
 
   useEffect(() => {
     if (!id) return;
 
     let isMounted = true;
-    const fallbackJob = jobs.find((currentJob) => String(currentJob.id) === id) ?? null;
 
     setLoadingJob(true);
     setJobError(null);
@@ -45,13 +43,13 @@ export function JobDetailPage() {
       .then(([apiJob, apiJobs]) => {
         if (!isMounted) return;
         setJob(apiJob);
-        setAllJobs(apiJobs.length > 0 ? apiJobs : jobs);
+        setAllJobs(apiJobs);
       })
-      .catch(() => {
+      .catch((error) => {
         if (!isMounted) return;
-        setJob(fallbackJob);
-        setAllJobs(jobs);
-        setJobError("Showing local job details until the jobs API is available.");
+        setJob(null);
+        setAllJobs([]);
+        setJobError(error instanceof Error ? error.message : "Job details could not be loaded.");
       })
       .finally(() => {
         if (isMounted) {
@@ -93,14 +91,23 @@ export function JobDetailPage() {
     );
   }
 
-  const handleSubmit = () => {
-    storeApplication(job, selectedResume, coverLetter);
-    setSubmitted(true);
-    window.setTimeout(() => {
-      setShowApplyModal(false);
-      setSubmitted(false);
-      navigate("/applications");
-    }, 1800);
+  const handleSubmit = async () => {
+    setSubmittingApplication(true);
+    setApplicationError(null);
+
+    try {
+      await createApplication({ job_id: String(job.id), resume_id: null });
+      setSubmitted(true);
+      window.setTimeout(() => {
+        setShowApplyModal(false);
+        setSubmitted(false);
+        navigate("/applications");
+      }, 1800);
+    } catch (error) {
+      setApplicationError(error instanceof Error ? error.message : "Application could not be submitted.");
+    } finally {
+      setSubmittingApplication(false);
+    }
   };
 
   return (
@@ -279,18 +286,6 @@ export function JobDetailPage() {
                 <p className="mb-5 text-sm text-syncus-blue/60">
                   {job.company} · {job.location}
                 </p>
-                <label className="mb-4 block">
-                  <span className="mb-1.5 block text-xs font-semibold text-syncus-blue/60">Select Resume *</span>
-                  <select
-                    value={selectedResume}
-                    onChange={(event) => setSelectedResume(event.target.value)}
-                    className="w-full rounded-xl border-2 border-syncus-green bg-syncus-cream px-3 py-2.5 text-sm text-syncus-blue outline-none"
-                  >
-                    <option>Product_Designer_Resume_v3.pdf</option>
-                    <option>Frontend_Engineer_Resume.pdf</option>
-                    <option>General_Resume_2026.pdf</option>
-                  </select>
-                </label>
                 <label className="mb-6 block">
                   <span className="mb-1.5 block text-xs font-semibold text-syncus-blue/60">Cover Letter (optional)</span>
                   <textarea
@@ -301,13 +296,19 @@ export function JobDetailPage() {
                     className="w-full resize-none rounded-xl border-2 border-syncus-green/30 bg-syncus-cream px-3 py-2.5 text-sm text-syncus-blue outline-none"
                   />
                 </label>
+                {applicationError && (
+                  <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                    {applicationError}
+                  </p>
+                )}
                 <div className="flex gap-3">
                   <button
                     onClick={handleSubmit}
-                    className="flex-1 rounded-2xl bg-syncus-green py-3 text-sm font-bold text-syncus-cream"
+                    className="flex-1 rounded-2xl bg-syncus-green py-3 text-sm font-bold text-syncus-cream disabled:opacity-60"
+                    disabled={submittingApplication}
                     type="button"
                   >
-                    Submit Application
+                    {submittingApplication ? "Submitting..." : "Submit Application"}
                   </button>
                   <button
                     onClick={() => setShowApplyModal(false)}

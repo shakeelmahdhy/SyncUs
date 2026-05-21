@@ -1,5 +1,3 @@
-from typing import Optional
-
 from fastapi import HTTPException, status
 from supabase import Client
 
@@ -36,6 +34,33 @@ class SearchService:
         if response.data and response.data[0].get("company_name"):
             return response.data[0]["company_name"]
         return "Employer"
+
+    def _candidate_skills(self, candidate_id: str) -> list[str]:
+        joins = (
+            self.db.table("job_seeker_skills")
+            .select("skill_id")
+            .eq("job_seeker_id", candidate_id)
+            .execute()
+        )
+        skill_ids = [row["skill_id"] for row in (joins.data or []) if row.get("skill_id")]
+        if not skill_ids:
+            return []
+
+        skills = self.db.table("skills").select("name").in_("id", skill_ids).execute()
+        return [row["name"] for row in (skills.data or []) if row.get("name")]
+
+    def _profile_completeness(self, candidate: dict, skills: list[str]) -> int:
+        fields = [
+            candidate.get("first_name"),
+            candidate.get("last_name"),
+            candidate.get("education"),
+            candidate.get("major"),
+            candidate.get("years_of_experience"),
+            candidate.get("academic_units"),
+            skills,
+        ]
+        completed = sum(1 for value in fields if value not in (None, "", [], {}))
+        return round((completed / len(fields)) * 100)
 
     async def search_jobs(self, request: JobSearchRequest) -> JobSearchResponse:
         """
@@ -112,27 +137,19 @@ class SearchService:
         self, request: CandidateFilterRequest
     ) -> CandidateFilterResponse:
         """
-        Filter candidate profiles for employers.
-        Supports skill tag matching, education, major, GPA, and location.
-        Returns only candidates with completed profiles.
+        Filter candidate profiles for employers using contract tables:
+        ``job_seekers``, ``job_seeker_skills``, and ``skills``.
         """
         try:
-            query = self.db.table("candidate_profiles").select("*", count="exact")
-
-            query = query.gte("profile_completeness", 80)
+            query = self.db.table("job_seekers").select(
+                "id, first_name, last_name, education, major, years_of_experience, academic_units, is_active, created_at",
+                count="exact",
+            )
 
             filters_applied = []
 
-            if request.skill_tags:
-                tags_lower = [s.strip().lower() for s in request.skill_tags if s.strip()]
-                if tags_lower:
-                    query = query.filter(
-                        "skills", "cs", f'{{{",".join(tags_lower)}}}'
-                    )
-                    filters_applied.append(f"skills: {', '.join(tags_lower)}")
-
             if request.education_level:
-                query = query.eq("education_level", request.education_level.lower())
+                query = query.ilike("education", f"%{request.education_level.strip()}%")
                 filters_applied.append(f"education: {request.education_level}")
 
             if request.major:
@@ -140,47 +157,57 @@ class SearchService:
                 filters_applied.append(f"major: {request.major}")
 
             if request.min_gpa is not None:
-                query = query.gte("gpa", request.min_gpa)
-                filters_applied.append(f"min GPA: {request.min_gpa}")
+                filters_applied.append("min GPA ignored: no GPA column in job_seekers")
 
             if request.location:
-                query = query.ilike("location", f"%{request.location.strip()}%")
-                filters_applied.append(f"location: {request.location}")
+                filters_applied.append("location ignored: no location column in job_seekers")
 
             if request.available_for:
-                query = query.eq("available_for", request.available_for.lower())
-                filters_applied.append(f"available for: {request.available_for}")
+                filters_applied.append("availability ignored: no availability column in job_seekers")
 
-            if request.sort_by == SortOrder.RELEVANCE:
-                query = query.order("profile_completeness", desc=True)
-            elif request.sort_by == SortOrder.NEWEST:
+            if request.sort_by == SortOrder.NEWEST:
                 query = query.order("created_at", desc=True)
-            else:
+            elif request.sort_by == SortOrder.OLDEST:
                 query = query.order("created_at", desc=False)
-
-            offset = (request.page - 1) * request.page_size
-            query = query.range(offset, offset + request.page_size - 1)
 
             response = query.execute()
 
-            total = response.count or 0
-            total_pages = max(1, (total + request.page_size - 1) // request.page_size)
+            tag_filters = [s.strip().lower() for s in (request.skill_tags or []) if s.strip()]
+            if tag_filters:
+                filters_applied.append(f"skills: {', '.join(tag_filters)}")
 
-            results = [
-                CandidateResult(
-                    candidate_id=str(c["id"]),
-                    full_name=c.get("full_name", ""),
-                    major=c.get("major"),
-                    education_level=c.get("education_level"),
-                    skills=c.get("skills", []),
-                    location=c.get("location"),
-                    gpa=c.get("gpa"),
-                    profile_completeness=c.get("profile_completeness"),
-                    has_github=bool(c.get("github_url")),
-                    available_for=c.get("available_for"),
+            candidates: list[CandidateResult] = []
+            for candidate in response.data or []:
+                skills = self._candidate_skills(str(candidate["id"]))
+                skill_text = {skill.lower() for skill in skills}
+                if tag_filters and not any(tag in skill_text for tag in tag_filters):
+                    continue
+
+                completeness = self._profile_completeness(candidate, skills)
+                candidates.append(
+                    CandidateResult(
+                        candidate_id=str(candidate["id"]),
+                        full_name=(
+                            f"{candidate.get('first_name') or ''} {candidate.get('last_name') or ''}"
+                        ).strip(),
+                        major=candidate.get("major"),
+                        education_level=candidate.get("education"),
+                        skills=skills,
+                        location=None,
+                        gpa=None,
+                        profile_completeness=completeness,
+                        has_github=False,
+                        available_for=None,
+                    )
                 )
-                for c in (response.data or [])
-            ]
+
+            if request.sort_by == SortOrder.RELEVANCE:
+                candidates.sort(key=lambda item: item.profile_completeness or 0, reverse=True)
+
+            total = len(candidates)
+            total_pages = max(1, (total + request.page_size - 1) // request.page_size)
+            offset = (request.page - 1) * request.page_size
+            results = candidates[offset : offset + request.page_size]
 
             return CandidateFilterResponse(
                 results=results,

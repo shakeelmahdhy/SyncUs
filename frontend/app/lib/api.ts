@@ -14,6 +14,15 @@ export function storeAccessToken(token: string) {
   window.localStorage.setItem(AUTH_TOKEN_KEY, token);
 }
 
+export function clearAccessToken() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(AUTH_TOKEN_KEY);
+}
+
+export function hasStoredAccessToken() {
+  return Boolean(getStoredAccessToken());
+}
+
 function getJwtSub(token: string | null) {
   if (!token) return null;
 
@@ -116,6 +125,26 @@ export function registerAccount(payload: RegisterAccountPayload) {
   });
 }
 
+export interface LoginAccountPayload {
+  email: string;
+  password: string;
+}
+
+export interface LoginAccountResponse {
+  access_token: string;
+  user: {
+    id: string;
+    email: string;
+  };
+}
+
+export function loginAccount(payload: LoginAccountPayload) {
+  return request<LoginAccountResponse>("/accounts/auth/login", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export type WorkMode = "remote" | "onsite" | "hybrid";
 export type JobStatus = "draft" | "published" | "closed";
 
@@ -153,6 +182,53 @@ export interface JobListResponse {
   total_pages: number;
 }
 
+export interface SearchJobResult {
+  job_id: string;
+  title: string;
+  company_name: string;
+  location: string;
+  work_mode: WorkMode | "";
+  required_skills: string[];
+  education_level: string | null;
+  experience_level: string | null;
+  salary_min: number | null;
+  salary_max: number | null;
+  published_at: string | null;
+  views_count: number;
+  applications_count: number;
+}
+
+export interface SearchJobResponse {
+  results: SearchJobResult[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  keyword_used: string | null;
+}
+
+export interface CandidateSearchResult {
+  candidate_id: string;
+  full_name: string;
+  major: string | null;
+  education_level: string | null;
+  skills: string[];
+  location: string | null;
+  gpa: number | null;
+  profile_completeness: number | null;
+  has_github: boolean;
+  available_for: string | null;
+}
+
+export interface CandidateSearchResponse {
+  results: CandidateSearchResult[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  filters_applied: string[];
+}
+
 export interface JobSearchParams {
   keyword?: string;
   location?: string;
@@ -174,6 +250,32 @@ export function searchJobs(params: JobSearchParams = {}) {
 
   const query = searchParams.toString();
   return request<JobListResponse>(`/jobs${query ? `?${query}` : ""}`);
+}
+
+export function searchJobDiscovery(params: JobSearchParams & { sort_by?: "newest" | "oldest" | "relevance" } = {}) {
+  const searchParams = new URLSearchParams();
+
+  if (params.keyword) searchParams.set("keyword", params.keyword);
+  if (params.location) searchParams.set("location", params.location);
+  if (params.work_mode) searchParams.set("work_mode", params.work_mode);
+  if (params.skills?.length) searchParams.set("skills", params.skills.join(","));
+  if (params.page) searchParams.set("page", String(params.page));
+  if (params.page_size) searchParams.set("page_size", String(params.page_size));
+  if (params.sort_by) searchParams.set("sort_by", params.sort_by);
+
+  const query = searchParams.toString();
+  return request<SearchJobResponse>(`/search/jobs${query ? `?${query}` : ""}`);
+}
+
+export function searchCandidates(params: { skills?: string[]; page?: number; page_size?: number } = {}) {
+  const searchParams = new URLSearchParams();
+
+  if (params.skills?.length) searchParams.set("skills", params.skills.join(","));
+  if (params.page) searchParams.set("page", String(params.page));
+  if (params.page_size) searchParams.set("page_size", String(params.page_size));
+
+  const query = searchParams.toString();
+  return request<CandidateSearchResponse>(`/search/candidates${query ? `?${query}` : ""}`);
 }
 
 export function getJob(jobId: string) {
@@ -228,6 +330,11 @@ export interface JobPipelineResponse {
   applications: TrackingApplication[];
 }
 
+export interface ApplicationListResponse {
+  items: TrackingApplication[];
+  total: number;
+}
+
 export interface CandidateRecommendation {
   candidate_id: string;
   name: string;
@@ -271,6 +378,17 @@ export function getEmployerJobStats() {
 
 export function getJobPipeline(jobId: string) {
   return request<JobPipelineResponse>(`/tracking/jobs/${jobId}/pipeline`);
+}
+
+export function listApplications() {
+  return request<ApplicationListResponse>("/tracking/applications");
+}
+
+export function createApplication(payload: { job_id: string; resume_id?: string | null }) {
+  return request<TrackingApplication>("/tracking/applications", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function updateApplicationStatus(applicationId: string, status: ApplicationStatus) {

@@ -1,5 +1,5 @@
-from app.core.supabase_client import get_supabase_anon_client
 from app.core.supabase_client import get_supabase_service_client
+from app.core.supabase_client import get_supabase_anon_client
 from fastapi import UploadFile
 from uuid import UUID
 import uuid
@@ -34,18 +34,55 @@ def create_user(payload):
 def get_user_profile(user_id: UUID):
     """Fetch a user's profile from job_seekers."""
     try:
+        service = get_supabase_service_client()
         response = (
-            _anon_supabase()
+            service
             .table("job_seekers")
             .select("*")
             .eq("id", str(user_id))
+            .limit(1)
             .execute()
         )
 
         if not response.data:
             return None
 
-        return response.data[0]
+        profile = response.data[0]
+        skill_links = (
+            service.table("job_seeker_skills")
+            .select("skill_id")
+            .eq("job_seeker_id", str(user_id))
+            .execute()
+        )
+        skill_ids = [row["skill_id"] for row in (skill_links.data or []) if row.get("skill_id")]
+        skills: list[str] = []
+        if skill_ids:
+            skill_rows = service.table("skills").select("name").in_("id", skill_ids).execute()
+            skills = [row["name"] for row in (skill_rows.data or []) if row.get("name")]
+
+        years = profile.get("years_of_experience")
+        education = profile.get("education") or ""
+        major = profile.get("major") or ""
+        return {
+            **profile,
+            "first_name": profile.get("first_name") or "",
+            "last_name": profile.get("last_name") or "",
+            "email": profile.get("email"),
+            "user_id": profile.get("id"),
+            "phone": profile.get("phone") or "",
+            "location": profile.get("location") or "",
+            "title": major,
+            "experience": "" if years is None else str(years),
+            "bio": profile.get("bio") or "",
+            "linkedin": profile.get("linkedin") or "",
+            "portfolio": profile.get("portfolio") or "",
+            "education": education,
+            "company": profile.get("company") or "",
+            "skills": skills,
+            "major": major,
+            "years_of_experience": years,
+            "academic_units": profile.get("academic_units") or [],
+        }
 
     except Exception as e:
         return {"error": f"Unable to fetch profile: {str(e)}"}
@@ -54,12 +91,25 @@ def get_user_profile(user_id: UUID):
 def update_user_profile(user_id: UUID, payload):
     """Update existing job_seeker profile."""
     try:
-        update_data = {
-            key: value
-            for key, value in payload.model_dump(exclude_none=True).items()
-        }
+        raw = payload.model_dump(exclude_none=True)
+        update_data = {}
 
-        _anon_supabase().table("job_seekers").update(update_data).eq("id", str(user_id)).execute()
+        for key in ("first_name", "last_name", "phone", "education", "major", "academic_units"):
+            if key in raw:
+                update_data[key] = raw[key]
+
+        if "title" in raw and "major" not in update_data:
+            update_data["major"] = raw["title"]
+
+        if "experience" in raw and "years_of_experience" not in raw:
+            digits = "".join(ch for ch in str(raw["experience"]) if ch.isdigit())
+            if digits:
+                update_data["years_of_experience"] = int(digits)
+        elif "years_of_experience" in raw:
+            update_data["years_of_experience"] = raw["years_of_experience"]
+
+        if update_data:
+            get_supabase_service_client().table("job_seekers").update(update_data).eq("id", str(user_id)).execute()
         return get_user_profile(user_id)
 
     except Exception as e:

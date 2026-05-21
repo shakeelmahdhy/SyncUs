@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Briefcase, CheckCircle2, ChevronLeft, ChevronRight, Filter, MapPin, Search, X } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import { Job, jobs } from '../data/mockData';
-import { searchJobs } from '../lib/api';
-import { toFrontendJob } from '../lib/jobs';
+import { searchJobDiscovery } from '../lib/api';
+import { type Job, toFrontendSearchJob } from '../lib/jobs';
 
 const jobTypes = ['Full-Time', 'Part-Time', 'Casual', 'Contract'];
 const locationModes = ['On-site', 'Remote', 'Hybrid'];
@@ -77,7 +76,7 @@ function JobCard({ job, onApply, onView }: { job: Job; onApply: () => void; onVi
 
 export function LandingPage() {
   const navigate = useNavigate();
-  const [availableJobs, setAvailableJobs] = useState<Job[]>(jobs);
+  const [availableJobs, setAvailableJobs] = useState<Job[]>([]);
   const [search, setSearch] = useState('');
   const [location, setLocation] = useState('');
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
@@ -91,16 +90,16 @@ export function LandingPage() {
   useEffect(() => {
     let isMounted = true;
 
-    searchJobs({ page_size: 100 })
+    searchJobDiscovery({ page_size: 100 })
       .then((response) => {
         if (!isMounted) return;
-        setAvailableJobs(response.jobs.map(toFrontendJob));
+        setAvailableJobs(response.results.map(toFrontendSearchJob));
         setJobsError(null);
       })
-      .catch(() => {
+      .catch((error) => {
         if (!isMounted) return;
-        setAvailableJobs(jobs);
-        setJobsError('Showing sample roles until the jobs API is available.');
+        setAvailableJobs([]);
+        setJobsError(error instanceof Error ? error.message : 'Jobs API is unavailable.');
       })
       .finally(() => {
         if (isMounted) {
@@ -239,8 +238,12 @@ export function LandingPage() {
                 />
               )) : (
                 <div className="rounded-2xl border-2 border-dashed border-syncus-green px-6 py-16 text-center text-syncus-green">
-                  <p className="text-xl font-bold">No jobs match your filters</p>
-                  <p className="mt-2 text-sm opacity-70">Try adjusting your search criteria.</p>
+                  <p className="text-xl font-bold">
+                    {jobsError ? 'Jobs could not be loaded' : 'No jobs match your filters'}
+                  </p>
+                  <p className="mt-2 text-sm opacity-70">
+                    {jobsError ? 'Check that the backend and Supabase environment are running.' : 'Try adjusting your search criteria.'}
+                  </p>
                 </div>
               )}
             </div>
