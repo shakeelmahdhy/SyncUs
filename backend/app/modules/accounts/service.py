@@ -1,7 +1,6 @@
 from app.core.supabase_client import get_supabase_anon_client
 from app.core.supabase_client import get_supabase_service_client
 from fastapi import UploadFile
-from uuid import UUID
 import uuid
 
 supabase = get_supabase_anon_client()
@@ -54,7 +53,7 @@ def get_user_profile(user_id):
         response = (
             supabase.table("job_seekers")
             .select("*")
-            .eq("id", user_uuid)
+            .eq("user_id", user_uuid)
             .execute()
         )
 
@@ -80,7 +79,7 @@ def update_user_profile(user_id, payload):
         if not update_data:
             return {"error": "No update data provided"}
 
-        supabase.table("job_seekers").update(update_data).eq("id", user_uuid).execute()
+        supabase.table("job_seekers").update(update_data).eq("user_id", user_uuid).execute()
 
         return get_user_profile(user_uuid)
 
