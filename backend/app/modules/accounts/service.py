@@ -7,16 +7,16 @@ supabase = get_supabase_anon_client()
 
 
 def _to_str_id(user_id) -> str:
-    """Convert UUID/string user id to string for Supabase queries."""
     return str(user_id)
 
 
-# ---------------- USER (job_seekers) ---------------- #
+# ---------------- USER / PROFILE ---------------- #
 
 def create_user(payload):
-    """Create a new profile record in job_seekers."""
+    """Create a new manual job_seeker profile."""
     try:
         user_uuid = _to_str_id(payload.user_id)
+        service_supabase = get_supabase_service_client()
 
         data = {
             "id": user_uuid,
@@ -33,7 +33,7 @@ def create_user(payload):
             "preferred_location": payload.preferred_location,
         }
 
-        response = supabase.table("job_seekers").insert(data).execute()
+        response = service_supabase.table("job_seekers").insert(data).execute()
 
         if not response.data:
             return {"error": "Profile creation failed: no data returned"}
@@ -45,30 +45,60 @@ def create_user(payload):
 
 
 def get_user_profile(user_id):
-    """Fetch a user's profile from job_seekers."""
+    """Fetch authenticated user's profile from job_seekers or employers."""
     try:
         user_uuid = _to_str_id(user_id)
+        service_supabase = get_supabase_service_client()
 
-        response = (
-            supabase.table("job_seekers")
+        job_seeker_response = (
+            service_supabase.table("job_seekers")
             .select("*")
             .eq("user_id", user_uuid)
             .execute()
         )
 
-        if not response.data:
-            return None
+        if job_seeker_response.data:
+            profile = job_seeker_response.data[0]
+            profile["role"] = "job_seeker"
+            return profile
 
-        return response.data[0]
+        employer_response = (
+            service_supabase.table("employers")
+            .select("*")
+            .eq("id", user_uuid)
+            .execute()
+        )
+
+        if employer_response.data:
+            employer = employer_response.data[0]
+
+            return {
+                "id": employer.get("id"),
+                "user_id": employer.get("id"),
+                "first_name": employer.get("company_name") or "Employer",
+                "last_name": "",
+                "email": None,
+                "phone": None,
+                "location": None,
+                "bio": employer.get("company_description"),
+                "work_experience": employer.get("industry"),
+                "skills": None,
+                "preferred_working_mode": None,
+                "preferred_location": None,
+                "role": "employer",
+            }
+
+        return None
 
     except Exception as e:
         return {"error": f"Unable to fetch profile: {str(e)}"}
 
 
 def update_user_profile(user_id, payload):
-    """Update existing job_seeker profile."""
+    """Update authenticated user's job_seeker or employer profile."""
     try:
         user_uuid = _to_str_id(user_id)
+        service_supabase = get_supabase_service_client()
 
         update_data = {
             key: value
@@ -78,9 +108,55 @@ def update_user_profile(user_id, payload):
         if not update_data:
             return {"error": "No update data provided"}
 
-        supabase.table("job_seekers").update(update_data).eq("user_id", user_uuid).execute()
+        job_seeker_check = (
+            service_supabase.table("job_seekers")
+            .select("id")
+            .eq("user_id", user_uuid)
+            .execute()
+        )
 
-        return get_user_profile(user_uuid)
+        if job_seeker_check.data:
+            service_supabase.table("job_seekers").update(update_data).eq(
+                "user_id", user_uuid
+            ).execute()
+
+            return get_user_profile(user_uuid)
+
+        employer_check = (
+            service_supabase.table("employers")
+            .select("id")
+            .eq("id", user_uuid)
+            .execute()
+        )
+
+        if employer_check.data:
+            employer_update = {}
+
+            if "first_name" in update_data or "last_name" in update_data:
+                current_profile = get_user_profile(user_uuid)
+                current_name = current_profile.get("first_name", "") if current_profile else ""
+
+                first_name = update_data.get("first_name", current_name)
+                last_name = update_data.get("last_name", "")
+
+                employer_update["company_name"] = f"{first_name} {last_name}".strip()
+
+            if "bio" in update_data:
+                employer_update["company_description"] = update_data["bio"]
+
+            if "work_experience" in update_data:
+                employer_update["industry"] = update_data["work_experience"]
+
+            if not employer_update:
+                return {"error": "No valid employer update fields provided"}
+
+            service_supabase.table("employers").update(employer_update).eq(
+                "id", user_uuid
+            ).execute()
+
+            return get_user_profile(user_uuid)
+
+        return {"error": "User not found"}
 
     except Exception as e:
         return {"error": f"Update failed: {str(e)}"}
@@ -92,6 +168,7 @@ def add_resume(user_id, payload):
     """Add an existing resume record by URL."""
     try:
         user_uuid = _to_str_id(user_id)
+        service_supabase = get_supabase_service_client()
 
         data = {
             "job_seeker_id": user_uuid,
@@ -99,7 +176,7 @@ def add_resume(user_id, payload):
             "file_url": payload.file_url,
         }
 
-        response = supabase.table("resumes").insert(data).execute()
+        response = service_supabase.table("resumes").insert(data).execute()
 
         if not response.data:
             return {"error": "Resume insert failed: no data returned"}
@@ -112,9 +189,8 @@ def add_resume(user_id, payload):
 
 def upload_resume_to_storage(user_id, file: UploadFile):
     """Upload resume file to Supabase Storage and register metadata."""
-    service_supabase = get_supabase_service_client()
-
     try:
+        service_supabase = get_supabase_service_client()
         user_uuid = _to_str_id(user_id)
 
         unique_name = f"{uuid.uuid4()}_{file.filename}"
