@@ -33,6 +33,7 @@ class UserResponse(BaseModel):
     phone: Optional[str] = None
     location: Optional[str] = None
     bio: Optional[str] = None
+    role: Optional[str] = None
 
     work_experience: Optional[str] = None
     skills: Optional[List[str]] = None
