@@ -125,7 +125,7 @@ def upload_resume_file(
 def register(payload: RegisterRequest):
     """
     Register a new user with Supabase Auth
-    and automatically create a job_seeker profile.
+    and automatically create a role-based profile.
     """
     result = register_user(payload)
 
