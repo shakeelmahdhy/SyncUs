@@ -25,10 +25,7 @@ def get_supabase_anon_client():
     if not anon_key:
         raise RuntimeError("Missing env var SUPABASE_ANON_KEY")
 
-    # Important:
-    # This repo contains a `supabase/` folder for Supabase CLI.
-    # That folder can shadow the installed `supabase-py` package.
-    # To avoid that, temporarily remove this repo root from sys.path during import.
+   
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
 
     removed = False
@@ -40,9 +37,7 @@ def get_supabase_anon_client():
     try:
         from supabase import create_client  # imported here to avoid shadowing
 
-        # Create a stateless anon client.
-        # Note: we intentionally avoid ClientOptions here because your current
-        # supabase-py version raises an error related to missing attributes.
+       
         return create_client(supabase_url, anon_key)
 
     finally:
@@ -56,7 +51,7 @@ def get_supabase_service_client():
     Used only for trusted backend operations like storage uploads.
     """
 
-    # Load environment variables from `backend/.env` (if present).
+    # Load environment variables from `backend/.env` 
     backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
     load_dotenv(dotenv_path=os.path.join(backend_dir, ".env"))
 
