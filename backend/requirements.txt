@@ -8,3 +8,4 @@ pydantic
 pytest
 email-validator
 pytest-asyncio
+python-dotenv

@@ -270,8 +270,8 @@ export function LandingPage() {
             <h3 className="font-serif text-3xl text-syncus-blue">Sign in to Apply</h3>
             <p className="mt-3 text-sm leading-relaxed text-syncus-green">Create a free account or sign in to track your applications and apply to jobs.</p>
             <div className="mt-8 grid gap-3 sm:grid-cols-2">
-              <button className="min-h-12 rounded-2xl bg-syncus-green px-5 text-sm font-bold text-syncus-cream transition hover:bg-syncus-blue" type="button" onClick={() => { setShowApplyModal(false); navigate(selectedJob ? `/jobs/${selectedJob.id}` : '/profile'); }}>
-                Apply Now
+              <button className="min-h-12 rounded-2xl bg-syncus-green px-5 text-sm font-bold text-syncus-cream transition hover:bg-syncus-blue" type="button" onClick={() => { setShowApplyModal(false); navigate('/login', { state: { from: selectedJob ? `/jobs/${selectedJob.id}` : '/applications' } }); }}>
+                Sign in
               </button>
               <button className="min-h-12 rounded-2xl border-2 border-syncus-green px-5 text-sm font-bold text-syncus-green transition hover:bg-syncus-green hover:text-syncus-cream" type="button" onClick={() => { setShowApplyModal(false); navigate('/register'); }}>
                 Create Account

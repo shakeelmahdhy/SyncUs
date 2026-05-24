@@ -27,7 +27,7 @@ app = FastAPI(
     title="SyncUs API",
     description="Intelligent Job Matching Platform",
     version="1.0.0",
-    docs_url="/api/docs",
+    docs_url="/docs",
 )
 
 _frontend = os.getenv("FRONTEND_URL", "").strip()
@@ -58,7 +58,7 @@ async def health_check():
 async def root():
     return {
         "message": "SyncUs API running",
-        "docs": "/api/docs",
+        "docs": "/docs",
         "health": "/health",
     }
 

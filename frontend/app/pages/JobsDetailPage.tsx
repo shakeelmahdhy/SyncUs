@@ -11,8 +11,8 @@ import {
   Star,
   Zap,
 } from "lucide-react";
-import { createApplication, getJob, searchJobs } from "../lib/api";
-import { type Job, toFrontendJob } from "../lib/jobs";
+import { createApplication, getJob, hasStoredAccessToken, searchJobDiscovery } from "../lib/api";
+import { type Job, toFrontendJob, toFrontendSearchJob } from "../lib/jobs";
 import { SyncUsMark } from "../shared/components";
 
 export function JobDetailPage() {
@@ -38,7 +38,7 @@ export function JobDetailPage() {
 
     Promise.all([
       getJob(id).then(toFrontendJob),
-      searchJobs({ page_size: 100 }).then((response) => response.jobs.map(toFrontendJob)),
+      searchJobDiscovery({ page_size: 100 }).then((response) => response.results.map(toFrontendSearchJob)),
     ])
       .then(([apiJob, apiJobs]) => {
         if (!isMounted) return;
@@ -91,7 +91,20 @@ export function JobDetailPage() {
     );
   }
 
+  const openApplyModal = () => {
+    if (!hasStoredAccessToken()) {
+      navigate("/login", { state: { from: `/jobs/${job?.id}` } });
+      return;
+    }
+    setShowApplyModal(true);
+  };
+
   const handleSubmit = async () => {
+    if (!hasStoredAccessToken()) {
+      navigate("/login", { state: { from: `/jobs/${job?.id}` } });
+      return;
+    }
+
     setSubmittingApplication(true);
     setApplicationError(null);
 
@@ -186,7 +199,7 @@ export function JobDetailPage() {
               </div>
 
               <button
-                onClick={() => setShowApplyModal(true)}
+                onClick={openApplyModal}
                 className="rounded-2xl bg-syncus-blue px-10 py-3 text-base font-bold text-syncus-cream transition hover:bg-syncus-green"
                 type="button"
               >
@@ -228,7 +241,7 @@ export function JobDetailPage() {
               <h3 className="mb-3 font-bold text-syncus-blue">Quick Apply</h3>
               <p className="mb-4 text-xs text-syncus-blue/60">Apply in under 60 seconds using your saved profile.</p>
               <button
-                onClick={() => setShowApplyModal(true)}
+                onClick={openApplyModal}
                 className="w-full rounded-2xl bg-syncus-green py-3 text-sm font-bold text-syncus-cream transition hover:bg-syncus-blue"
                 type="button"
               >

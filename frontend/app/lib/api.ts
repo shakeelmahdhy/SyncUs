@@ -4,6 +4,25 @@ const defaultApiBaseUrl =
     : "http://127.0.0.1:8000";
 const API_BASE_URL = ((import.meta as unknown) as { env: { VITE_API_BASE_URL?: string } }).env.VITE_API_BASE_URL ?? defaultApiBaseUrl;
 const AUTH_TOKEN_KEY = "syncus_access_token";
+const ACCOUNT_TYPE_KEY = "syncus_account_type";
+
+export type StoredAccountType = "job_seeker" | "employer";
+
+export function storeAccountType(accountType: StoredAccountType) {
+  window.localStorage.setItem(ACCOUNT_TYPE_KEY, accountType);
+}
+
+export function getStoredAccountType(): StoredAccountType | null {
+  if (typeof window === "undefined") return null;
+  const value = window.localStorage.getItem(ACCOUNT_TYPE_KEY);
+  if (value === "employer" || value === "job_seeker") return value;
+  return null;
+}
+
+export function clearAccountType() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(ACCOUNT_TYPE_KEY);
+}
 
 export function getStoredAccessToken() {
   if (typeof window === "undefined") return null;
@@ -17,6 +36,7 @@ export function storeAccessToken(token: string) {
 export function clearAccessToken() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(AUTH_TOKEN_KEY);
+  clearAccountType();
 }
 
 export function hasStoredAccessToken() {
@@ -41,23 +61,54 @@ function getJwtSub(token: string | null) {
 }
 
 export interface AccountProfile {
-  id: number;
+  id?: string;
+  user_id?: string;
   first_name: string;
   last_name: string;
-  email: string;
+  email?: string;
   phone: string;
-  location: string;
+  education: string;
+  skills: string[];
   title: string;
   experience: string;
-  bio: string;
-  linkedin: string;
-  portfolio: string;
-  education: string;
-  company: string;
-  skills: string[];
 }
 
-export type AccountProfileUpdate = Omit<AccountProfile, "id">;
+export type AccountProfileUpdate = Omit<AccountProfile, "id" | "user_id"> & { email?: string };
+
+export interface ResumeRecord {
+  id: string;
+  job_seeker_id: string;
+  resume_name: string | null;
+  file_url: string;
+  is_primary: boolean;
+  created_at: string | null;
+}
+
+export interface ResumeListResponse {
+  items: ResumeRecord[];
+  total: number;
+}
+
+async function parseApiError(response: Response) {
+  const raw = await response.text();
+  if (!raw) {
+    return `Request failed with ${response.status}`;
+  }
+
+  try {
+    const payload = JSON.parse(raw) as { detail?: string | Array<{ msg?: string }> };
+    if (typeof payload.detail === "string") {
+      return payload.detail;
+    }
+    if (Array.isArray(payload.detail)) {
+      return payload.detail.map((item) => item.msg).filter(Boolean).join(", ") || raw;
+    }
+  } catch {
+    // Fall through to raw text.
+  }
+
+  return raw;
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getStoredAccessToken();
@@ -71,8 +122,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `Request failed with ${response.status}`);
+    throw new Error(await parseApiError(response));
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
   }
 
   return response.json() as Promise<T>;
@@ -135,7 +189,12 @@ export interface LoginAccountResponse {
   user: {
     id: string;
     email: string;
+    account_type: AccountType;
   };
+}
+
+export function getAuthenticatedUserId() {
+  return getJwtSub(getStoredAccessToken());
 }
 
 export function loginAccount(payload: LoginAccountPayload) {
@@ -403,4 +462,39 @@ export function updateApplicationStatus(applicationId: string, status: Applicati
 
 export function getCandidateRecommendations(jobId: string) {
   return request<CandidateRecommendation[]>(`/matching/jobs/${jobId}/candidates`);
+}
+
+export function listProfileResumes() {
+  const userId = getAuthenticatedUserId();
+  if (!userId) {
+    return Promise.reject(new Error("No authenticated user"));
+  }
+  return request<ResumeListResponse>(`/accounts/profile/${userId}/resumes`);
+}
+
+export async function uploadProfileResume(file: File) {
+  const userId = getAuthenticatedUserId();
+  if (!userId) {
+    throw new Error("No authenticated user");
+  }
+
+  const token = getStoredAccessToken();
+  const body = new FormData();
+  body.append("file", file);
+
+  const response = await fetch(`${API_BASE_URL}/accounts/profile/${userId}/resume/upload`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body,
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseApiError(response));
+  }
+
+  return response.json() as Promise<ResumeRecord>;
+}
+
+export function checkBackendHealth() {
+  return request<{ status: string; service: string; version: string }>("/health");
 }

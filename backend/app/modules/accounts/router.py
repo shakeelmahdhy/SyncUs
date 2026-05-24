@@ -7,6 +7,7 @@ from .schema import (
     UserUpdateRequest,
     ResumeCreateRequest,
     ResumeResponse,
+    ResumeListResponse,
     RegisterRequest,
     LoginRequest,
 )
@@ -18,6 +19,7 @@ from .service import (
     add_resume,
     parse_profile_data,
     upload_resume_to_storage,
+    list_user_resumes,
     register_user,
     login_user,
 )
@@ -44,6 +46,8 @@ def create_profile(payload: UserCreateRequest) -> UserResponse:
 def get_profile(user_id: UUID):
     """Fetch an existing profile by user_id."""
     result = get_user_profile(user_id)
+    if isinstance(result, dict) and "error" in result:
+        raise HTTPException(status_code=500, detail=result["error"])
     if not result:
         raise HTTPException(status_code=404, detail="User not found")
     return result
@@ -69,6 +73,15 @@ def update_profile(user_id: UUID, payload: UserUpdateRequest) -> UserResponse:
 
 # ---------------- RESUME MANAGEMENT ---------------- #
 
+@router.get("/profile/{user_id}/resumes", response_model=ResumeListResponse)
+def get_resumes(user_id: UUID) -> ResumeListResponse:
+    result = list_user_resumes(user_id)
+    if isinstance(result, dict) and "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    items = [ResumeResponse(**row) for row in result]
+    return ResumeListResponse(items=items, total=len(items))
+
+
 @router.post("/profile/{user_id}/resume", response_model=ResumeResponse)
 def add_resume_record(user_id: UUID, payload: ResumeCreateRequest) -> ResumeResponse:
     """Add an existing resume record by providing a file URL."""
@@ -92,8 +105,7 @@ def upload_resume_file(user_id: UUID, file: UploadFile = File(...)):
 @router.post("/auth/register")
 def register(payload: RegisterRequest):
     """
-    Register a new user with Supabase Auth 
-    and automatically create a job_seeker profile.
+    Register a new user with Supabase Auth and create an employer or job_seeker profile.
     """
     result = register_user(payload)
     if "error" in result:

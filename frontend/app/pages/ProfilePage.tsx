@@ -1,29 +1,47 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Briefcase,
   CheckCircle,
   Code,
   GraduationCap,
   Plus,
-  Trash2,
   Upload,
   User,
 } from "lucide-react";
-import { getAccountProfile, updateAccountProfile, type AccountProfile } from "../lib/api";
+import {
+  getAccountProfile,
+  listProfileResumes,
+  updateAccountProfile,
+  uploadProfileResume,
+  type AccountProfile,
+  type ResumeRecord,
+} from "../lib/api";
 
-interface Resume {
-  id: number;
+interface ResumeView {
+  id: string;
   name: string;
   uploadedDate: string;
-  size: string;
   isDefault: boolean;
+  fileUrl: string;
 }
 
-const initialResumes: Resume[] = [
-  { id: 1, name: "Product_Designer_Resume_v3.pdf", uploadedDate: "Apr 10, 2026", size: "245 KB", isDefault: true },
-  { id: 2, name: "Frontend_Engineer_Resume.pdf", uploadedDate: "Mar 5, 2026", size: "198 KB", isDefault: false },
-  { id: 3, name: "General_Resume_2026.pdf", uploadedDate: "Jan 20, 2026", size: "210 KB", isDefault: false },
-];
+function toResumeView(record: ResumeRecord): ResumeView {
+  const uploadedDate = record.created_at
+    ? new Date(record.created_at).toLocaleDateString("en-AU", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "Recently uploaded";
+
+  return {
+    id: record.id,
+    name: record.resume_name || "Resume",
+    uploadedDate,
+    isDefault: record.is_primary,
+    fileUrl: record.file_url,
+  };
+}
 
 const skillSuggestions = [
   "Figma",
@@ -46,49 +64,35 @@ const personalFields = [
   { label: "Last Name", key: "lastName" },
   { label: "Email Address", key: "email" },
   { label: "Phone Number", key: "phone" },
-  { label: "Location", key: "location", wide: true },
-  { label: "LinkedIn", key: "linkedin" },
-  { label: "Portfolio / Website", key: "portfolio" },
 ] as const;
 
 const professionalFields = [
   { label: "Current Job Title", key: "title" },
   { label: "Years of Experience", key: "experience" },
-  { label: "Current Company", key: "company" },
   { label: "Education", key: "education" },
 ] as const;
 
-const fallbackProfile = {
-  firstName: "Alex",
-  lastName: "Johnson",
-  email: "alex.johnson@email.com",
-  phone: "+61 400 000 000",
-  location: "Sydney, NSW, Australia",
-  title: "Senior Product Designer",
-  experience: "5+ years",
-  bio: "Passionate product designer with 5+ years of experience creating intuitive digital experiences. Specialised in design systems and user research.",
-  linkedin: "linkedin.com/in/alexjohnson",
-  portfolio: "alexjohnson.design",
-  education: "Bachelor of Design, University of Sydney, 2019",
-  company: "Freelance",
+const emptyProfile = {
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+  title: "",
+  experience: "",
+  education: "",
 };
 
-type ProfileForm = typeof fallbackProfile;
+type ProfileForm = typeof emptyProfile;
 
 function toProfileForm(profile: AccountProfile): ProfileForm {
   return {
     firstName: profile.first_name,
     lastName: profile.last_name,
-    email: profile.email,
+    email: profile.email ?? "",
     phone: profile.phone,
-    location: profile.location,
     title: profile.title,
     experience: profile.experience,
-    bio: profile.bio,
-    linkedin: profile.linkedin,
-    portfolio: profile.portfolio,
     education: profile.education,
-    company: profile.company,
   };
 }
 
@@ -96,45 +100,47 @@ function toAccountProfileUpdate(form: ProfileForm, skills: string[]) {
   return {
     first_name: form.firstName,
     last_name: form.lastName,
-    email: form.email,
     phone: form.phone,
-    location: form.location,
     title: form.title,
     experience: form.experience,
-    bio: form.bio,
-    linkedin: form.linkedin,
-    portfolio: form.portfolio,
     education: form.education,
-    company: form.company,
     skills,
   };
 }
 
 export function ProfilePage() {
+  const uploadInputRef = useRef<HTMLInputElement>(null);
   const [activeStep, setActiveStep] = useState(0);
-  const [resumes, setResumes] = useState(initialResumes);
-  const [skills, setSkills] = useState(["Figma", "User Research", "Prototyping", "Design Systems"]);
+  const [resumes, setResumes] = useState<ResumeView[]>([]);
+  const [skills, setSkills] = useState<string[]>([]);
   const [newSkill, setNewSkill] = useState("");
   const [saved, setSaved] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingResume, setUploadingResume] = useState(false);
 
-  const [form, setForm] = useState<ProfileForm>(fallbackProfile);
+  const [form, setForm] = useState<ProfileForm>(emptyProfile);
+
+  const loadResumes = () =>
+    listProfileResumes()
+      .then((response) => setResumes(response.items.map(toResumeView)))
+      .catch(() => setResumes([]));
 
   useEffect(() => {
     let isMounted = true;
 
-    getAccountProfile()
-      .then((profile) => {
+    Promise.all([getAccountProfile(), listProfileResumes()])
+      .then(([profile, resumeResponse]) => {
         if (!isMounted) return;
         setForm(toProfileForm(profile));
         setSkills(profile.skills);
+        setResumes(resumeResponse.items.map(toResumeView));
         setProfileError(null);
       })
-      .catch(() => {
+      .catch((error) => {
         if (!isMounted) return;
-        setProfileError("Using local profile data until the backend is available.");
+        setProfileError(error instanceof Error ? error.message : "Profile could not be loaded.");
       })
       .finally(() => {
         if (isMounted) {
@@ -160,14 +166,23 @@ export function ProfilePage() {
     setForm((current) => ({ ...current, [key]: value }));
   };
 
-  const deleteResume = (id: number) => {
-    setResumes((current) => current.filter((resume) => resume.id !== id));
-  };
+  const handleResumeUpload = async (file: File | undefined) => {
+    if (!file) return;
 
-  const setDefault = (id: number) => {
-    setResumes((current) =>
-      current.map((resume) => ({ ...resume, isDefault: resume.id === id }))
-    );
+    setUploadingResume(true);
+    setProfileError(null);
+
+    try {
+      await uploadProfileResume(file);
+      await loadResumes();
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : "Resume upload failed.");
+    } finally {
+      setUploadingResume(false);
+      if (uploadInputRef.current) {
+        uploadInputRef.current.value = "";
+      }
+    }
   };
 
   const addSkill = (skill: string) => {
@@ -280,15 +295,6 @@ export function ProfilePage() {
                       />
                     </label>
                   ))}
-                  <label className="md:col-span-2">
-                    <span className="mb-1.5 block text-xs font-bold text-syncus-blue/55">Professional Bio</span>
-                    <textarea
-                      rows={4}
-                      value={form.bio}
-                      onChange={(event) => updateField("bio", event.target.value)}
-                      className="w-full resize-none rounded-xl border-2 border-syncus-blue/20 bg-syncus-cream px-4 py-3 text-sm text-syncus-blue outline-none transition focus:border-syncus-green"
-                    />
-                  </label>
                 </div>
               </div>
             )}
@@ -356,15 +362,29 @@ export function ProfilePage() {
                 <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h2 className="text-xl font-bold text-syncus-blue">My Resumes</h2>
                   <button
-                    className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-syncus-green px-4 text-sm font-bold text-syncus-cream"
+                    className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-syncus-green px-4 text-sm font-bold text-syncus-cream disabled:opacity-60"
+                    disabled={uploadingResume}
+                    onClick={() => uploadInputRef.current?.click()}
                     type="button"
                   >
                     <Upload size={14} />
-                    Upload Resume
+                    {uploadingResume ? "Uploading..." : "Upload Resume"}
                   </button>
+                  <input
+                    ref={uploadInputRef}
+                    accept=".pdf,.doc,.docx"
+                    className="hidden"
+                    type="file"
+                    onChange={(event) => void handleResumeUpload(event.target.files?.[0])}
+                  />
                 </div>
 
                 <div className="grid gap-3">
+                  {resumes.length === 0 && (
+                    <p className="rounded-xl border-2 border-dashed border-syncus-blue/15 px-4 py-8 text-center text-sm font-medium text-syncus-blue/55">
+                      No resumes uploaded yet. Upload a PDF or Word document to apply faster.
+                    </p>
+                  )}
                   {resumes.map((resume) => (
                     <article
                       key={resume.id}
@@ -378,33 +398,30 @@ export function ProfilePage() {
                         <Briefcase size={16} color={resume.isDefault ? "#f6f8ed" : "#1e4890"} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-bold text-syncus-blue">{resume.name}</p>
-                        <p className="text-xs text-syncus-blue/50">
-                          {resume.size} · Uploaded {resume.uploadedDate}
-                        </p>
+                        <a
+                          className="truncate text-sm font-bold text-syncus-blue underline decoration-syncus-green underline-offset-4"
+                          href={resume.fileUrl}
+                          rel="noreferrer"
+                          target="_blank"
+                        >
+                          {resume.name}
+                        </a>
+                        <p className="text-xs text-syncus-blue/50">Uploaded {resume.uploadedDate}</p>
                       </div>
-                      {resume.isDefault ? (
+                      {resume.isDefault && (
                         <span className="flex w-fit items-center gap-1 rounded-full bg-syncus-green px-3 py-1 text-xs font-bold text-syncus-cream">
                           <CheckCircle size={10} />
-                          Default
+                          Primary
                         </span>
-                      ) : (
-                        <button
-                          onClick={() => setDefault(resume.id)}
-                          className="w-fit text-xs font-bold text-syncus-blue underline underline-offset-4"
-                          type="button"
-                        >
-                          Set Default
-                        </button>
                       )}
-                      <button
-                        onClick={() => deleteResume(resume.id)}
-                        className="w-fit text-red-500 transition hover:opacity-70"
-                        type="button"
-                        aria-label={`Delete ${resume.name}`}
+                      <a
+                        className="w-fit text-xs font-bold text-syncus-blue underline underline-offset-4"
+                        href={resume.fileUrl}
+                        rel="noreferrer"
+                        target="_blank"
                       >
-                        <Trash2 size={16} />
-                      </button>
+                        View
+                      </a>
                     </article>
                   ))}
                 </div>

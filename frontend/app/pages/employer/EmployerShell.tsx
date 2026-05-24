@@ -1,7 +1,34 @@
 import type { ReactNode } from "react";
 import { BarChart3, BriefcaseBusiness, ClipboardList, LayoutDashboard, Search } from "lucide-react";
 import { NavLink, useNavigate } from "react-router";
+import { clearAccessToken, getStoredAccessToken } from "../../lib/api";
 import { SyncUsMark } from "../../shared/components";
+
+function getDisplayNameFromToken() {
+  const token = getStoredAccessToken();
+  if (!token) return { initials: "SU", label: "Employer" };
+
+  try {
+    const [, payload] = token.split(".");
+    const normalizedPayload = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const paddedPayload = normalizedPayload.padEnd(
+      normalizedPayload.length + ((4 - (normalizedPayload.length % 4)) % 4),
+      "="
+    );
+    const decoded = JSON.parse(window.atob(paddedPayload)) as { email?: string };
+    const email = decoded.email ?? "Employer";
+    const initials = email
+      .split("@")[0]
+      .split(/[._-]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part.charAt(0).toUpperCase())
+      .join("");
+    return { initials: initials || "SU", label: email };
+  } catch {
+    return { initials: "SU", label: "Employer" };
+  }
+}
 
 const employerLinks = [
   { label: "Dashboard", to: "/employer/dashboard", icon: LayoutDashboard },
@@ -11,6 +38,7 @@ const employerLinks = [
 
 export function EmployerShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
+  const employerIdentity = getDisplayNameFromToken();
 
   return (
     <main className="bg-syncus-cream text-syncus-blue">
@@ -68,14 +96,26 @@ export function EmployerShell({ children }: { children: ReactNode }) {
               >
                 + Post a New Job
               </button>
+              <button
+                className="min-h-12 rounded-lg border border-white/30 px-4 text-sm font-bold text-syncus-cream transition hover:bg-white/10"
+                onClick={() => {
+                  clearAccessToken();
+                  navigate("/employer/login");
+                }}
+                type="button"
+              >
+                Sign out
+              </button>
               <div className="hidden items-center gap-3 sm:flex">
                 <span className="grid h-11 w-11 place-items-center rounded-full bg-syncus-cream text-syncus-blue">
-                  JD
+                  {employerIdentity.initials}
                 </span>
                 <span>
-                  <span className="block font-serif text-xl leading-none">John Doe</span>
+                  <span className="block max-w-[220px] truncate font-serif text-xl leading-none">
+                    {employerIdentity.label}
+                  </span>
                   <span className="block text-[0.66rem] font-bold uppercase tracking-[0.12em] text-white/72">
-                    Talent Lead
+                    Employer account
                   </span>
                 </span>
               </div>

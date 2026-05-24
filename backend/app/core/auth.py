@@ -4,6 +4,7 @@ JWT authentication for SyncUs (Option A).
 Verifies Supabase Auth access tokens sent as:
   Authorization: Bearer <access_jwt>
 
+Supports legacy HS256 (SUPABASE_JWT_SECRET) and asymmetric ES256/RS256 via Supabase JWKS.
 The canonical user id is JWT claim ``sub`` (UUID), matching ``auth.users.id``.
 Role is inferred from ``public.employers`` / ``public.job_seekers`` (not ``user_profiles``).
 """
@@ -17,6 +18,7 @@ from typing import Annotated, Literal
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jwt import PyJWKClient
 from uuid import UUID
 
 from app.core.supabase_client import get_supabase_service_client
@@ -25,6 +27,8 @@ UserRole = Literal["employer", "job_seeker"]
 
 _bearer = HTTPBearer(auto_error=True)
 _bearer_optional = HTTPBearer(auto_error=False)
+
+_jwks_client: PyJWKClient | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,15 +50,95 @@ def _jwt_secret() -> str:
     return secret
 
 
+def _supabase_jwks_client() -> PyJWKClient:
+    global _jwks_client
+    if _jwks_client is None:
+        base = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+        if not base:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="SUPABASE_URL is not configured",
+            )
+        _jwks_client = PyJWKClient(f"{base}/auth/v1/.well-known/jwks.json", cache_keys=True)
+    return _jwks_client
+
+
+def _decode_token_payload(token: str) -> dict:
+    """Verify Supabase access JWT (HS256 legacy or ES256/RS256 via JWKS)."""
+    try:
+        header = jwt.get_unverified_header(token)
+    except jwt.PyJWTError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+
+    alg = header.get("alg", "HS256")
+    errors: list[Exception] = []
+
+    if alg == "HS256":
+        try:
+            return jwt.decode(
+                token,
+                _jwt_secret(),
+                algorithms=["HS256"],
+                audience="authenticated",
+            )
+        except jwt.PyJWTError as exc:
+            errors.append(exc)
+
+    if alg in ("ES256", "RS256"):
+        try:
+            signing_key = _supabase_jwks_client().get_signing_key_from_jwt(token)
+            return jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=[alg],
+                audience="authenticated",
+            )
+        except jwt.PyJWTError as exc:
+            errors.append(exc)
+        except Exception as exc:
+            errors.append(exc)
+
+    # Fallback: try the other verification path (mixed Supabase project configs).
+    if alg != "HS256":
+        try:
+            return jwt.decode(
+                token,
+                _jwt_secret(),
+                algorithms=["HS256"],
+                audience="authenticated",
+            )
+        except jwt.PyJWTError as exc:
+            errors.append(exc)
+
+    if alg == "HS256":
+        try:
+            signing_key = _supabase_jwks_client().get_signing_key_from_jwt(token)
+            return jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=["ES256", "RS256"],
+                audience="authenticated",
+            )
+        except Exception as exc:
+            errors.append(exc)
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid or expired token",
+        headers={"WWW-Authenticate": "Bearer"},
+    ) from (errors[-1] if errors else None)
+
+
 def _decode_sub_and_email(token: str) -> tuple[UUID, str | None]:
     """Verify access JWT and return ``(sub, email)``."""
     try:
-        payload = jwt.decode(
-            token,
-            _jwt_secret(),
-            algorithms=["HS256"],
-            audience="authenticated",
-        )
+        payload = _decode_token_payload(token)
+    except HTTPException:
+        raise
     except jwt.PyJWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

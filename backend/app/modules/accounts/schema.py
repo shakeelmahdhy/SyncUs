@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 from uuid import UUID
 from typing import Literal, Optional
 
@@ -65,6 +65,13 @@ class ResumeResponse(BaseModel):
     job_seeker_id: UUID
     resume_name: Optional[str] = None
     file_url: str
+    is_primary: bool = False
+    created_at: Optional[str] = None
+
+
+class ResumeListResponse(BaseModel):
+    items: list[ResumeResponse]
+    total: int
 
 
 
@@ -76,6 +83,12 @@ class RegisterRequest(BaseModel):
     password: str
     account_type: Literal["job_seeker", "employer"] = "job_seeker"
     company_name: Optional[str] = None
+
+    @model_validator(mode="after")
+    def employer_requires_company_name(self) -> "RegisterRequest":
+        if self.account_type == "employer" and not (self.company_name or "").strip():
+            raise ValueError("company_name is required for employer accounts")
+        return self
 
 
 class LoginRequest(BaseModel):

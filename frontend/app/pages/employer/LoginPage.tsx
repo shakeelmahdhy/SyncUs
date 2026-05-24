@@ -6,6 +6,7 @@ import {
   getEmployerJobStats,
   loginAccount,
   storeAccessToken,
+  storeAccountType,
 } from "../../lib/api";
 
 export function EmployerLoginPage() {
@@ -24,7 +25,14 @@ export function EmployerLoginPage() {
 
     try {
       const response = await loginAccount({ email: email.trim(), password });
+
+      if (response.user.account_type !== "employer") {
+        setError("This account is not registered as an employer. Use job seeker login or register as an employer.");
+        return;
+      }
+
       storeAccessToken(response.access_token);
+      storeAccountType("employer");
 
       try {
         await getEmployerJobStats();

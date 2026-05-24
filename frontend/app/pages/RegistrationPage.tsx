@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router";
 import {
   registerAccount,
   storeAccessToken,
+  storeAccountType,
   type AccountType,
   type RegisterAccountPayload,
 } from "../lib/api";
@@ -83,6 +84,7 @@ export function RegistrationPage() {
       const response = await registerAccount(payload);
       if (response.access_token) {
         storeAccessToken(response.access_token);
+        storeAccountType(accountType);
         navigate(accountType === "job_seeker" ? "/profile" : "/employer/dashboard");
         return;
       }

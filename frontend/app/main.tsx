@@ -10,8 +10,10 @@ import { RequireEmployer } from './pages/employer/RequireEmployer';
 import { EmployerReviewApplicationsPage } from './pages/employer/ReviewApplicationsPage';
 import { JobDetailPage } from './pages/JobsDetailPage';
 import { LandingPage } from './pages/LandingPage';
+import { LoginPage } from './pages/LoginPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { RegistrationPage } from './pages/RegistrationPage';
+import { RequireAuth } from './pages/RequireAuth';
 import { SiteFooter, SiteNav } from './shared/components';
 
 function AppRoutes() {
@@ -23,9 +25,24 @@ function AppRoutes() {
       {!isEmployerRoute && <SiteNav />}
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/applications" element={<ApplicationsPage />} />
+        <Route
+          path="/applications"
+          element={
+            <RequireAuth>
+              <ApplicationsPage />
+            </RequireAuth>
+          }
+        />
         <Route path="/jobs/:id" element={<JobDetailPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
+        <Route
+          path="/profile"
+          element={
+            <RequireAuth>
+              <ProfilePage />
+            </RequireAuth>
+          }
+        />
+        <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegistrationPage />} />
         <Route path="/employer/login" element={<EmployerLoginPage />} />
         <Route
