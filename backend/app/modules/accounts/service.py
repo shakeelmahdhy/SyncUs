@@ -246,18 +246,15 @@ def parse_profile_data(user_id):
 # ---------------- AUTH ---------------- #
 
 def register_user(payload):
-    """Register a user with Supabase Auth and create role-based profile."""
+    """Register a user with Supabase Auth and create auto-confirmed role-based profile."""
     try:
-        try:
-            auth_response = supabase.auth.sign_up(
-                email=payload.email,
-                password=payload.password,
-            )
-        except TypeError:
-            auth_response = supabase.auth.sign_up({
-                "email": payload.email,
-                "password": payload.password,
-            })
+        service_supabase = get_supabase_service_client()
+
+        auth_response = service_supabase.auth.admin.create_user({
+            "email": payload.email,
+            "password": payload.password,
+            "email_confirm": True,
+        })
 
         user = getattr(auth_response, "user", None)
 
@@ -270,7 +267,6 @@ def register_user(payload):
             return {"error": "Supabase signup returned no user ID"}
 
         user_uuid = _to_str_id(user_id)
-        service_supabase = get_supabase_service_client()
 
         if payload.role == "job_seeker":
             data = {
