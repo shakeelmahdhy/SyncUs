@@ -75,9 +75,9 @@ def get_user_profile(user_id):
             return {
                 "id": employer.get("id"),
                 "user_id": employer.get("id"),
-                "first_name": employer.get("company_name") or "Employer",
-                "last_name": "",
-                "email": None,
+                "first_name": employer.get("first_name"),
+                "last_name": employer.get("last_name"),
+                "email": employer.get("email"),
                 "phone": None,
                 "location": None,
                 "bio": employer.get("company_description"),
@@ -86,6 +86,10 @@ def get_user_profile(user_id):
                 "preferred_working_mode": None,
                 "preferred_location": None,
                 "role": "employer",
+                "company_name": employer.get("company_name"),
+                "company_description": employer.get("company_description"),
+                "industry": employer.get("industry"),
+                "is_verified": employer.get("is_verified"),
             }
 
         return None
@@ -116,7 +120,28 @@ def update_user_profile(user_id, payload):
         )
 
         if job_seeker_check.data:
-            service_supabase.table("job_seekers").update(update_data).eq(
+            allowed_job_seeker_fields = {
+                "first_name",
+                "last_name",
+                "phone",
+                "location",
+                "bio",
+                "work_experience",
+                "skills",
+                "preferred_working_mode",
+                "preferred_location",
+            }
+
+            job_seeker_update = {
+                key: value
+                for key, value in update_data.items()
+                if key in allowed_job_seeker_fields
+            }
+
+            if not job_seeker_update:
+                return {"error": "No valid job seeker update fields provided"}
+
+            service_supabase.table("job_seekers").update(job_seeker_update).eq(
                 "user_id", user_uuid
             ).execute()
 
@@ -130,22 +155,19 @@ def update_user_profile(user_id, payload):
         )
 
         if employer_check.data:
-            employer_update = {}
+            allowed_employer_fields = {
+                "first_name",
+                "last_name",
+                "company_name",
+                "company_description",
+                "industry",
+            }
 
-            if "first_name" in update_data or "last_name" in update_data:
-                current_profile = get_user_profile(user_uuid)
-                current_name = current_profile.get("first_name", "") if current_profile else ""
-
-                first_name = update_data.get("first_name", current_name)
-                last_name = update_data.get("last_name", "")
-
-                employer_update["company_name"] = f"{first_name} {last_name}".strip()
-
-            if "bio" in update_data:
-                employer_update["company_description"] = update_data["bio"]
-
-            if "work_experience" in update_data:
-                employer_update["industry"] = update_data["work_experience"]
+            employer_update = {
+                key: value
+                for key, value in update_data.items()
+                if key in allowed_employer_fields
+            }
 
             if not employer_update:
                 return {"error": "No valid employer update fields provided"}
@@ -280,11 +302,17 @@ def register_user(payload):
             response = service_supabase.table("job_seekers").insert(data).execute()
 
         elif payload.role == "employer":
+            if not payload.company_name:
+                return {"error": "Company name is required for employer registration"}
+
             data = {
                 "id": user_uuid,
-                "company_name": f"{payload.first_name} {payload.last_name}",
-                "company_description": None,
-                "industry": None,
+                "email": payload.email,
+                "first_name": payload.first_name,
+                "last_name": payload.last_name,
+                "company_name": payload.company_name,
+                "company_description": payload.company_description,
+                "industry": payload.industry,
                 "is_verified": False,
             }
 
