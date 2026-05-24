@@ -6,7 +6,11 @@ Verifies Supabase Auth access tokens sent as:
 
 Supports legacy HS256 (SUPABASE_JWT_SECRET) and asymmetric ES256/RS256 via Supabase JWKS.
 The canonical user id is JWT claim ``sub`` (UUID), matching ``auth.users.id``.
-Role is inferred from ``public.employers`` / ``public.job_seekers`` (not ``user_profiles``).
+Role is inferred from ``public.employers`` / ``public.job_seekers``.
+
+Supabase signing:
+  - **ES256** (current default): asymmetric — verify with the public key from JWKS.
+  - **HS256** (legacy): symmetric — verify with ``SUPABASE_JWT_SECRET`` from the dashboard.
 """
 
 from __future__ import annotations
@@ -14,6 +18,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from typing import Annotated, Literal
+from uuid import UUID
 
 import jwt
 from fastapi import Depends, HTTPException, status
@@ -40,7 +45,8 @@ class CurrentUser:
     role: UserRole | None = None
 
 
-def _jwt_secret() -> str:
+def _jwt_secret() -> str | None:
+    """Legacy HS256 secret from the dashboard (optional when using ES256 + JWKS)."""
     secret = os.environ.get("SUPABASE_JWT_SECRET", "").strip()
     if not secret:
         raise HTTPException(
@@ -144,7 +150,12 @@ def _decode_sub_and_email(token: str) -> tuple[UUID, str | None]:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
-        ) from None
+        ) from exc
+
+
+def _decode_sub_and_email(token: str) -> tuple[UUID, str | None]:
+    """Verify access JWT and return ``(sub, email)``."""
+    payload = _verify_and_decode(token)
 
     raw_sub = payload.get("sub")
     if not raw_sub:
