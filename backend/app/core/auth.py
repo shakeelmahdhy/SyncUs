@@ -13,7 +13,10 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from typing import Annotated, Literal
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -48,6 +51,7 @@ def _jwt_secret() -> str:
 
 def _decode_sub_and_email(token: str) -> tuple[UUID, str | None]:
     """Verify access JWT and return ``(sub, email)``."""
+<<<<<<< Updated upstream
     try:
         payload = jwt.decode(
             token,
@@ -61,6 +65,9 @@ def _decode_sub_and_email(token: str) -> tuple[UUID, str | None]:
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
         ) from None
+=======
+    payload = _decode_token_payload(token)
+>>>>>>> Stashed changes
 
     raw_sub = payload.get("sub")
     if not raw_sub:

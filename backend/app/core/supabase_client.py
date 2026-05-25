@@ -19,8 +19,10 @@ Both clients are created lazily and cached as module-level singletons.
 from __future__ import annotations
 
 import os
+import re
 import sys
 from typing import Optional
+from urllib.parse import urlparse
 
 
 _service_client: Optional["object"] = None
@@ -56,6 +58,30 @@ def _require_env(name: str) -> str:
     return value
 
 
+def _supabase_url() -> str:
+    """Resolve and validate the Supabase project URL before creating clients."""
+    url = _require_env("SUPABASE_URL").strip().rstrip("/")
+    parsed = urlparse(url)
+    host = parsed.hostname or ""
+
+    if parsed.scheme not in {"http", "https"} or not host:
+        raise RuntimeError(
+            "Invalid SUPABASE_URL. Set it to your Supabase Project URL, "
+            "for example: https://<project-ref>.supabase.co."
+        )
+
+    if host.endswith(".supabase.co"):
+        project_ref = host.removesuffix(".supabase.co")
+        if len(project_ref) != 20 or not re.fullmatch(r"[a-z0-9]+", project_ref):
+            raise RuntimeError(
+                "Invalid SUPABASE_URL project ref. Copy the Project URL from "
+                "Supabase Dashboard > Project Settings > API. It should look "
+                "like https://<20-character-project-ref>.supabase.co."
+            )
+
+    return url
+
+
 def _publishable_key() -> str:
     """Resolve the canonical publishable API key."""
     key = (os.environ.get("SUPABASE_PUBLISHABLE_KEY") or "").strip()
@@ -71,7 +97,7 @@ def get_supabase_service_client():
     """Return a process-wide Supabase client built with the SECRET key (bypasses RLS)."""
     global _service_client
     if _service_client is None:
-        url = _require_env("SUPABASE_URL")
+        url = _supabase_url()
         key = _require_env("SUPABASE_SECRET_KEY")
         create_client = _import_supabase_create_client()
         _service_client = create_client(url, key)
@@ -82,7 +108,7 @@ def get_supabase_publishable_client():
     """Return a process-wide Supabase client built with the publishable key."""
     global _publishable_client
     if _publishable_client is None:
-        url = _require_env("SUPABASE_URL")
+        url = _supabase_url()
         key = _publishable_key()
         create_client = _import_supabase_create_client()
         _publishable_client = create_client(url, key)
