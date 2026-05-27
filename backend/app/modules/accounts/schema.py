@@ -10,17 +10,17 @@ class UserCreateRequest(BaseModel):
     first_name: str
     last_name: str
     email: EmailStr
+
     phone: Optional[str] = None
     location: Optional[str] = None
     bio: Optional[str] = None
 
-    # New requirement fields
+    # Candidate enhancement fields
     work_experience: Optional[str] = None
     skills: Optional[List[str]] = None
     preferred_working_mode: Optional[str] = None
     preferred_location: Optional[str] = None
-
-    
+    membership: Optional[bool] = False
 
 
 class UserResponse(BaseModel):
@@ -35,37 +35,43 @@ class UserResponse(BaseModel):
     bio: Optional[str] = None
     role: Optional[str] = None
 
+    # Candidate fields
     work_experience: Optional[str] = None
     skills: Optional[List[str]] = None
     preferred_working_mode: Optional[str] = None
     preferred_location: Optional[str] = None
 
+    # Employer fields
     company_name: Optional[str] = None
     company_description: Optional[str] = None
     industry: Optional[str] = None
     is_verified: Optional[bool] = None
 
-    
+    # Membership field
+    membership: Optional[bool] = False
 
 
 class UserUpdateRequest(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
-    
+
     phone: Optional[str] = None
     location: Optional[str] = None
     bio: Optional[str] = None
 
+    # Candidate fields
     work_experience: Optional[str] = None
     skills: Optional[List[str]] = None
     preferred_working_mode: Optional[str] = None
     preferred_location: Optional[str] = None
 
+    # Employer fields
     company_name: Optional[str] = None
     company_description: Optional[str] = None
     industry: Optional[str] = None
 
-   
+    # Membership update
+    membership: Optional[bool] = None
 
 
 # -------- RESUME --------
@@ -89,12 +95,17 @@ class RegisterRequest(BaseModel):
     last_name: str
     email: EmailStr
     password: str
+
     role: Literal["job_seeker", "employer"] = "job_seeker"
 
     # Employer-only fields
     company_name: Optional[str] = None
     company_description: Optional[str] = None
     industry: Optional[str] = None
+
+    # Membership option
+    membership: Optional[bool] = False
+
 
 class LoginRequest(BaseModel):
     email: EmailStr
