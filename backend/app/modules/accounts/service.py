@@ -31,6 +31,7 @@ def create_user(payload):
             "skills": payload.skills,
             "preferred_working_mode": payload.preferred_working_mode,
             "preferred_location": payload.preferred_location,
+            "membership": getattr(payload, "membership", False),
         }
 
         response = service_supabase.table("job_seekers").insert(data).execute()
@@ -81,7 +82,7 @@ def get_user_profile(user_id):
                 "phone": None,
                 "location": None,
                 "bio": employer.get("company_description"),
-                "work_experience": employer.get("industry"),
+                "work_experience": None,
                 "skills": None,
                 "preferred_working_mode": None,
                 "preferred_location": None,
@@ -90,6 +91,7 @@ def get_user_profile(user_id):
                 "company_description": employer.get("company_description"),
                 "industry": employer.get("industry"),
                 "is_verified": employer.get("is_verified"),
+                "membership": employer.get("membership", False),
             }
 
         return None
@@ -130,6 +132,7 @@ def update_user_profile(user_id, payload):
                 "skills",
                 "preferred_working_mode",
                 "preferred_location",
+                "membership",
             }
 
             job_seeker_update = {
@@ -161,6 +164,7 @@ def update_user_profile(user_id, payload):
                 "company_name",
                 "company_description",
                 "industry",
+                "membership",
             }
 
             employer_update = {
@@ -297,6 +301,7 @@ def register_user(payload):
                 "first_name": payload.first_name,
                 "last_name": payload.last_name,
                 "email": payload.email,
+                "membership": payload.membership,
             }
 
             response = service_supabase.table("job_seekers").insert(data).execute()
@@ -314,6 +319,7 @@ def register_user(payload):
                 "company_description": payload.company_description,
                 "industry": payload.industry,
                 "is_verified": False,
+                "membership": payload.membership,
             }
 
             response = service_supabase.table("employers").insert(data).execute()
@@ -354,28 +360,31 @@ def login_user(payload):
 
         user_id = str(response.user.id)
         role = None
+        membership = False
 
         service_supabase = get_supabase_service_client()
 
         job_seeker_response = (
             service_supabase.table("job_seekers")
-            .select("id")
+            .select("id, membership")
             .eq("user_id", user_id)
             .execute()
         )
 
         if job_seeker_response.data:
             role = "job_seeker"
+            membership = job_seeker_response.data[0].get("membership", False)
         else:
             employer_response = (
                 service_supabase.table("employers")
-                .select("id")
+                .select("id, membership")
                 .eq("id", user_id)
                 .execute()
             )
 
             if employer_response.data:
                 role = "employer"
+                membership = employer_response.data[0].get("membership", False)
 
         return {
             "access_token": access_token,
@@ -383,6 +392,7 @@ def login_user(payload):
                 "id": user_id,
                 "email": response.user.email,
                 "role": role,
+                "membership": membership,
             },
         }
 
