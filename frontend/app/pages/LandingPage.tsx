@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Briefcase, CheckCircle2, ChevronLeft, ChevronRight, Filter, MapPin, Search, X } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import { Job, jobs } from '../data/mockData';
-import { SiteFooter, SiteNav } from '../shared/components';
+import { searchJobDiscovery } from '../lib/api';
+import { type Job, toFrontendSearchJob } from '../lib/jobs';
 
 const jobTypes = ['Full-Time', 'Part-Time', 'Casual', 'Contract'];
 const locationModes = ['On-site', 'Remote', 'Hybrid'];
@@ -14,24 +14,30 @@ function normalise(value: string) {
 
 function FilterCheckbox({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
   return (
-    <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-syncus-green">
+    <label className="flex cursor-pointer items-center gap-2 text-[0.82rem] font-medium text-syncus-green">
       <input className="h-3.5 w-3.5 accent-syncus-green" type="checkbox" checked={checked} onChange={onChange} />
       <span>{label}</span>
     </label>
   );
 }
 
-function JobCard({ job, onApply }: { job: Job; onApply: () => void }) {
+function JobCard({ job, onApply, onView }: { job: Job; onApply: () => void; onView: () => void }) {
   return (
-    <article className="rounded-2xl border-2 border-syncus-green bg-syncus-cream p-5 shadow-card transition duration-200 hover:-translate-y-1 hover:shadow-syncus">
-      <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex gap-4">
-          <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-syncus-green text-syncus-cream">
-            <Briefcase size={25} />
+    <article className="rounded-2xl border-2 border-syncus-green bg-syncus-cream p-4 shadow-card transition duration-200 hover:-translate-y-0.5 hover:shadow-syncus sm:p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex gap-3.5">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-syncus-green text-syncus-cream">
+            <Briefcase size={22} />
           </div>
-          <div>
-            <h3 className="text-2xl font-medium leading-tight text-syncus-green">{job.title}</h3>
-            <p className="mt-1 text-base font-medium text-syncus-blue">{job.company} · {job.location}</p>
+          <div className="min-w-0">
+            <button
+              className="text-left text-[clamp(1.2rem,1.9vw,1.6rem)] font-medium leading-tight text-syncus-green transition hover:text-syncus-blue"
+              type="button"
+              onClick={onView}
+            >
+              {job.title}
+            </button>
+            <p className="mt-1 text-sm font-medium text-syncus-blue sm:text-base">{job.company} · {job.location}</p>
           </div>
         </div>
         <div className="flex shrink-0 items-start gap-3 sm:flex-col sm:items-end">
@@ -40,13 +46,13 @@ function JobCard({ job, onApply }: { job: Job; onApply: () => void }) {
         </div>
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-2">
+      <div className="mt-4 flex flex-wrap gap-2">
         {[job.locationMode, job.workType, `Responds within ${job.respondsWithin}`].map((tag) => (
-          <span key={tag} className="rounded-md bg-syncus-blue/35 px-3 py-1.5 text-xs font-bold text-white">{tag}</span>
+          <span key={tag} className="rounded-md bg-syncus-blue/35 px-2.5 py-1.5 text-xs font-bold text-white">{tag}</span>
         ))}
       </div>
 
-      <div className="mt-5 border-t border-syncus-green/25 pt-4">
+      <div className="mt-4 border-t border-syncus-green/25 pt-4">
         <p className="text-sm italic text-syncus-green">{job.description}</p>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap gap-2">
@@ -54,9 +60,14 @@ function JobCard({ job, onApply }: { job: Job; onApply: () => void }) {
               <span key={skill} className="rounded-full border border-syncus-green/45 px-3 py-1 text-xs font-medium text-syncus-green">{skill}</span>
             ))}
           </div>
-          <button className="min-h-9 rounded-lg bg-syncus-blue px-8 text-sm font-bold text-syncus-cream transition hover:bg-syncus-green" type="button" onClick={onApply}>
-            Quick Apply
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button className="min-h-9 rounded-lg border-2 border-syncus-blue px-5 text-sm font-bold text-syncus-blue transition hover:bg-syncus-blue hover:text-syncus-cream" type="button" onClick={onView}>
+              View role
+            </button>
+            <button className="min-h-9 rounded-lg bg-syncus-blue px-6 text-sm font-bold text-syncus-cream transition hover:bg-syncus-green" type="button" onClick={onApply}>
+              Quick Apply
+            </button>
+          </div>
         </div>
       </div>
     </article>
@@ -65,15 +76,44 @@ function JobCard({ job, onApply }: { job: Job; onApply: () => void }) {
 
 export function LandingPage() {
   const navigate = useNavigate();
+  const [availableJobs, setAvailableJobs] = useState<Job[]>([]);
   const [search, setSearch] = useState('');
   const [location, setLocation] = useState('');
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [selectedModes, setSelectedModes] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [showApplyModal, setShowApplyModal] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [loadingJobs, setLoadingJobs] = useState(true);
+  const [jobsError, setJobsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    searchJobDiscovery({ page_size: 100 })
+      .then((response) => {
+        if (!isMounted) return;
+        setAvailableJobs(response.results.map(toFrontendSearchJob));
+        setJobsError(null);
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        setAvailableJobs([]);
+        setJobsError(error instanceof Error ? error.message : 'Jobs API is unavailable.');
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoadingJobs(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const filtered = useMemo(() => {
-    return jobs.filter((job) => {
+    return availableJobs.filter((job) => {
       const query = search.trim().toLowerCase();
       const locationQuery = location.trim().toLowerCase();
       const matchesSearch = !query || [job.title, job.company, job.description, job.category, ...job.skills].some((value) => value.toLowerCase().includes(query));
@@ -82,7 +122,7 @@ export function LandingPage() {
       const matchesMode = selectedModes.length === 0 || selectedModes.some((mode) => normalise(mode) === normalise(job.locationMode));
       return matchesSearch && matchesLocation && matchesType && matchesMode;
     });
-  }, [location, search, selectedModes, selectedTypes]);
+  }, [availableJobs, location, search, selectedModes, selectedTypes]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / JOBS_PER_PAGE));
   const visiblePage = Math.min(currentPage, totalPages);
@@ -107,23 +147,21 @@ export function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen overflow-hidden bg-syncus-cream text-syncus-blue">
-      <SiteNav />
-
+    <div className="overflow-hidden">
       <main className="relative">
         <div className="pointer-events-none absolute left-[-8%] top-[40px] h-[640px] w-[520px] rounded-[46%] bg-syncus-green/15 blur-3xl" />
         <div className="pointer-events-none absolute left-[28%] top-[130px] h-[430px] w-[360px] rotate-[-17deg] rounded-[38%] bg-syncus-green/12 blur-3xl" />
         <div className="pointer-events-none absolute right-[10%] top-[260px] h-[360px] w-[360px] rounded-full bg-syncus-lime/10 blur-3xl" />
 
-        <section className="relative mx-auto max-w-[1260px] px-5 pb-20 pt-20 text-center sm:px-8 lg:pt-24">
-          <h1 className="mx-auto max-w-[980px] font-serif text-[clamp(3rem,7vw,6.6rem)] leading-[0.96] tracking-normal">
-            <span className="block bg-gradient-to-r from-syncus-lime via-syncus-green to-syncus-blue bg-clip-text text-transparent">Syncing You</span>
-            <span className="block bg-gradient-to-r from-syncus-lime via-syncus-green to-syncus-blue bg-clip-text text-transparent">With The Perfect Role</span>
+        <section className="relative mx-auto max-w-[1180px] px-5 pb-14 pt-14 text-center sm:px-8 lg:pb-16 lg:pt-16">
+          <h1 className="mx-auto max-w-[1040px] font-serif text-[clamp(2rem,6vw,5.35rem)] leading-[0.98] tracking-normal">
+            <span className="block whitespace-nowrap bg-gradient-to-r from-syncus-lime via-syncus-green to-syncus-blue bg-clip-text text-transparent">Syncing You With The</span>
+            <span className="block whitespace-nowrap bg-gradient-to-r from-syncus-lime via-syncus-green to-syncus-blue bg-clip-text text-transparent">Perfect Role</span>
           </h1>
-          <p className="mt-8 text-lg font-medium text-syncus-blue">Find Your Perfect Match.</p>
+          <p className="mt-6 text-base font-medium text-syncus-blue sm:text-lg">Find Your Perfect Match.</p>
 
-          <form className="mx-auto mt-5 flex max-w-[720px] flex-col gap-2 rounded-2xl border-2 border-syncus-green bg-syncus-cream p-2 shadow-syncus sm:flex-row" onSubmit={(event) => event.preventDefault()}>
-            <label className="flex min-h-12 flex-1 items-center gap-3 rounded-xl bg-syncus-green/15 px-4 text-syncus-green">
+          <form className="mx-auto mt-5 flex max-w-[680px] flex-col gap-2 rounded-2xl border-2 border-syncus-green bg-syncus-cream p-2 shadow-syncus sm:flex-row" onSubmit={(event) => event.preventDefault()}>
+            <label className="flex min-h-11 flex-1 items-center gap-3 rounded-xl bg-syncus-green/15 px-4 text-syncus-green">
               <Search size={18} />
               <input
                 className="min-w-0 flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-syncus-green/70"
@@ -133,20 +171,20 @@ export function LandingPage() {
                 onChange={(event) => { setSearch(event.target.value); setCurrentPage(1); }}
               />
             </label>
-            <button className="min-h-12 rounded-xl bg-syncus-green px-9 text-base font-bold text-syncus-cream transition hover:-translate-y-0.5 hover:bg-syncus-blue" type="submit">
+            <button className="min-h-11 rounded-xl bg-syncus-green px-8 text-base font-bold text-syncus-cream transition hover:-translate-y-0.5 hover:bg-syncus-blue" type="submit">
               Search
             </button>
           </form>
         </section>
 
-        <section id="jobs" className="relative mx-auto grid max-w-[1180px] gap-10 px-5 pb-28 sm:px-8 lg:grid-cols-[300px_1fr] lg:items-start">
-          <aside className="rounded-2xl border-2 border-syncus-green bg-syncus-cream p-6 shadow-card lg:sticky lg:top-28">
-            <div className="mb-6 flex items-center gap-3 text-syncus-green">
-              <Filter size={20} />
-              <h2 className="text-xl font-bold">Quick Filters</h2>
+        <section id="jobs" className="relative mx-auto grid max-w-[1120px] gap-8 px-5 pb-20 sm:px-8 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start">
+          <aside className="rounded-2xl border-2 border-syncus-green bg-syncus-cream p-5 shadow-card lg:sticky lg:top-24">
+            <div className="mb-5 flex items-center gap-2.5 text-syncus-green">
+              <Filter size={18} />
+              <h2 className="text-lg font-bold">Quick Filters</h2>
             </div>
 
-            <div className="mb-6">
+            <div className="mb-5">
               <p className="mb-2 text-sm font-bold text-syncus-green">Location</p>
               <label className="flex min-h-10 items-center gap-2 rounded-xl border-2 border-syncus-green px-3 text-syncus-green">
                 <MapPin size={15} />
@@ -159,16 +197,16 @@ export function LandingPage() {
               </label>
             </div>
 
-            <div className="mb-6">
+            <div className="mb-5">
               <p className="mb-3 text-sm font-bold text-syncus-green">Job Type</p>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
                 {jobTypes.map((type) => <FilterCheckbox key={type} label={type} checked={selectedTypes.includes(type)} onChange={() => toggleType(type)} />)}
               </div>
             </div>
 
             <div>
               <p className="mb-3 text-sm font-bold text-syncus-green">Work Mode</p>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
                 {locationModes.map((mode) => <FilterCheckbox key={mode} label={mode} checked={selectedModes.includes(mode)} onChange={() => toggleMode(mode)} />)}
               </div>
             </div>
@@ -181,32 +219,49 @@ export function LandingPage() {
           </aside>
 
           <section>
-            <h2 className="mb-8 text-[clamp(2rem,4vw,3.1rem)] font-serif leading-none text-syncus-green">Active Job Postings ({filtered.length})</h2>
-            <div className="grid gap-6">
-              {paged.length > 0 ? paged.map((job) => <JobCard key={job.id} job={job} onApply={() => setShowApplyModal(true)} />) : (
+            <div className="mb-6">
+              <h2 className="text-[clamp(1.85rem,3.2vw,2.65rem)] font-serif leading-none text-syncus-green">Active Job Postings ({filtered.length})</h2>
+              <p className="mt-2 text-sm font-medium text-syncus-blue/55">
+                {loadingJobs ? 'Loading live roles...' : jobsError ?? 'Live roles matched to your profile and search.'}
+              </p>
+            </div>
+            <div className="grid gap-5">
+              {paged.length > 0 ? paged.map((job) => (
+                <JobCard
+                  key={job.id}
+                  job={job}
+                  onApply={() => {
+                    setSelectedJob(job);
+                    setShowApplyModal(true);
+                  }}
+                  onView={() => navigate(`/jobs/${job.id}`)}
+                />
+              )) : (
                 <div className="rounded-2xl border-2 border-dashed border-syncus-green px-6 py-16 text-center text-syncus-green">
-                  <p className="text-xl font-bold">No jobs match your filters</p>
-                  <p className="mt-2 text-sm opacity-70">Try adjusting your search criteria.</p>
+                  <p className="text-xl font-bold">
+                    {jobsError ? 'Jobs could not be loaded' : 'No jobs match your filters'}
+                  </p>
+                  <p className="mt-2 text-sm opacity-70">
+                    {jobsError ? 'Check that the backend and Supabase environment are running.' : 'Try adjusting your search criteria.'}
+                  </p>
                 </div>
               )}
             </div>
 
             {filtered.length > JOBS_PER_PAGE && (
-              <div className="mt-12 flex items-center justify-center gap-3">
-                <button className="grid h-11 w-11 place-items-center rounded-xl border-2 border-syncus-green text-syncus-green transition hover:bg-syncus-green hover:text-syncus-cream" type="button" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} aria-label="Previous page"><ChevronLeft size={18} /></button>
+              <div className="mt-10 flex items-center justify-center gap-2.5">
+                <button className="grid h-10 w-10 place-items-center rounded-xl border-2 border-syncus-green text-syncus-green transition hover:bg-syncus-green hover:text-syncus-cream" type="button" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} aria-label="Previous page"><ChevronLeft size={18} /></button>
                 {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
-                  <button key={page} className={`grid h-11 w-11 place-items-center rounded-xl border-2 border-syncus-green text-lg font-bold transition ${page === visiblePage ? 'bg-syncus-green text-syncus-cream' : 'text-syncus-green hover:bg-syncus-green hover:text-syncus-cream'}`} type="button" onClick={() => setCurrentPage(page)}>
+                  <button key={page} className={`grid h-10 w-10 place-items-center rounded-xl border-2 border-syncus-green text-base font-bold transition ${page === visiblePage ? 'bg-syncus-green text-syncus-cream' : 'text-syncus-green hover:bg-syncus-green hover:text-syncus-cream'}`} type="button" onClick={() => setCurrentPage(page)}>
                     {page}
                   </button>
                 ))}
-                <button className="grid h-11 w-11 place-items-center rounded-xl border-2 border-syncus-green text-syncus-green transition hover:bg-syncus-green hover:text-syncus-cream" type="button" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} aria-label="Next page"><ChevronRight size={18} /></button>
+                <button className="grid h-10 w-10 place-items-center rounded-xl border-2 border-syncus-green text-syncus-green transition hover:bg-syncus-green hover:text-syncus-cream" type="button" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} aria-label="Next page"><ChevronRight size={18} /></button>
               </div>
             )}
           </section>
         </section>
       </main>
-
-      <SiteFooter />
 
       {showApplyModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-syncus-blue/45 px-5 backdrop-blur-sm">
@@ -215,11 +270,11 @@ export function LandingPage() {
             <h3 className="font-serif text-3xl text-syncus-blue">Sign in to Apply</h3>
             <p className="mt-3 text-sm leading-relaxed text-syncus-green">Create a free account or sign in to track your applications and apply to jobs.</p>
             <div className="mt-8 grid gap-3 sm:grid-cols-2">
-              <button className="min-h-12 rounded-2xl bg-syncus-green px-5 text-sm font-bold text-syncus-cream transition hover:bg-syncus-blue" type="button" onClick={() => { setShowApplyModal(false); navigate('/profile'); }}>
-                Create Account
+              <button className="min-h-12 rounded-2xl bg-syncus-green px-5 text-sm font-bold text-syncus-cream transition hover:bg-syncus-blue" type="button" onClick={() => { setShowApplyModal(false); navigate('/login', { state: { from: selectedJob ? `/jobs/${selectedJob.id}` : '/applications' } }); }}>
+                Sign in
               </button>
-              <button className="min-h-12 rounded-2xl border-2 border-syncus-green px-5 text-sm font-bold text-syncus-green transition hover:bg-syncus-green hover:text-syncus-cream" type="button" onClick={() => setShowApplyModal(false)}>
-                Sign In
+              <button className="min-h-12 rounded-2xl border-2 border-syncus-green px-5 text-sm font-bold text-syncus-green transition hover:bg-syncus-green hover:text-syncus-cream" type="button" onClick={() => { setShowApplyModal(false); navigate('/register'); }}>
+                Create Account
               </button>
             </div>
             <button className="mt-5 text-xs font-bold text-syncus-blue/70 underline underline-offset-4" type="button" onClick={() => setShowApplyModal(false)}>
