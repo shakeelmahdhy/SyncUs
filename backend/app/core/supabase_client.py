@@ -74,8 +74,25 @@ def get_supabase_service_client():
         url = _require_env("SUPABASE_URL")
         key = _require_env("SUPABASE_SECRET_KEY")
         create_client = _import_supabase_create_client()
-        _service_client = create_client(url, key)
+        try:
+            from supabase.lib.client_options import ClientOptions
+            from supabase_auth import AuthFlowType
+
+            options = ClientOptions(
+                auto_refresh_token=False,
+                persist_session=False,
+                flow_type=AuthFlowType.IMPLICIT,
+            )
+            _service_client = create_client(url, key, options)
+        except Exception:
+            _service_client = create_client(url, key)
     return _service_client
+
+
+def reset_supabase_service_client() -> None:
+    """Drop the cached service client (e.g. after accidental user sign-in on it)."""
+    global _service_client
+    _service_client = None
 
 
 def get_supabase_publishable_client():

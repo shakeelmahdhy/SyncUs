@@ -141,21 +141,7 @@ def _decode_token_payload(token: str) -> dict:
 
 def _decode_sub_and_email(token: str) -> tuple[UUID, str | None]:
     """Verify access JWT and return ``(sub, email)``."""
-    try:
-        payload = _decode_token_payload(token)
-    except HTTPException:
-        raise
-    except jwt.PyJWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"},
-        ) from exc
-
-
-def _decode_sub_and_email(token: str) -> tuple[UUID, str | None]:
-    """Verify access JWT and return ``(sub, email)``."""
-    payload = _verify_and_decode(token)
+    payload = _decode_token_payload(token)
 
     raw_sub = payload.get("sub")
     if not raw_sub:

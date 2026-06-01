@@ -3,7 +3,9 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router';
 import './styles.css';
 import { ApplicationsPage } from './pages/ApplicationsPage';
-import { EmployerAnalyticsPage } from './pages/employer/AnalyticsPage';`r`nimport { EmployerDashboardPage } from './pages/employer/DashboardPage';`r`nimport { HiringTeamPage } from './pages/employer/HiringTeamPage';
+import { EmployerAnalyticsPage } from './pages/employer/AnalyticsPage';
+import { EmployerDashboardPage } from './pages/employer/DashboardPage';
+// import { HiringTeamPage } from './pages/employer/HiringTeamPage';
 import { EmployerLoginPage } from './pages/employer/LoginPage';
 import { EmployerPostJobPage } from './pages/employer/PostJobPage';
 import { RequireEmployer } from './pages/employer/RequireEmployer';
@@ -91,14 +93,14 @@ function AppRoutes() {
             </RequireEmployer>
           }
         />
-        <Route
+        {/* <Route
           path="/employer/hiring-team"
           element={
             <RequireEmployer>
               <HiringTeamPage />
             </RequireEmployer>
           }
-        />
+        /> */}
         <Route
           path="/employer/analytics"
           element={

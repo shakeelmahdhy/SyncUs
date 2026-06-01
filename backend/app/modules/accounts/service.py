@@ -23,13 +23,41 @@ def _lookup_user_email(user_id: UUID) -> str | None:
         return None
 
 
+def _job_seeker_row(
+    user_id: str,
+    *,
+    first_name: str = "",
+    last_name: str = "",
+    email: str | None = None,
+    phone: str | None = None,
+) -> dict:
+    """Build a ``job_seekers`` insert payload for the live Supabase schema."""
+    row = {
+        "id": user_id,
+        "user_id": user_id,
+        "first_name": first_name,
+        "last_name": last_name,
+    }
+    if email:
+        row["email"] = email
+    if phone:
+        row["phone"] = phone
+    return row
+
+
 def _resolve_account_type(user_id: UUID) -> str | None:
     service = _service_supabase()
     user_key = str(user_id)
     employer = service.table("employers").select("id").eq("id", user_key).limit(1).execute()
     if employer.data:
         return "employer"
-    seeker = service.table("job_seekers").select("id").eq("id", user_key).limit(1).execute()
+    seeker = (
+        service.table("job_seekers")
+        .select("id")
+        .or_(f"id.eq.{user_key},user_id.eq.{user_key}")
+        .limit(1)
+        .execute()
+    )
     if seeker.data:
         return "job_seeker"
     return None
@@ -64,12 +92,13 @@ def create_user(payload):
     try:
         user_uuid = str(payload.user_id)
 
-        data = {
-            "id": user_uuid,
-            "first_name": payload.first_name,
-            "last_name": payload.last_name,
-            "phone": payload.phone,
-        }
+        data = _job_seeker_row(
+            user_uuid,
+            first_name=payload.first_name,
+            last_name=payload.last_name,
+            email=str(payload.email),
+            phone=payload.phone,
+        )
 
         response = get_supabase_service_client().table("job_seekers").insert(data).execute()
         return response.data[0]
@@ -106,7 +135,13 @@ def _provision_job_seeker_if_missing(user_id: UUID) -> bool:
     except Exception:
         pass
 
-    data = {"id": user_key, "first_name": first_name, "last_name": last_name}
+    email = _lookup_user_email(user_id) or ""
+    data = _job_seeker_row(
+        user_key,
+        first_name=first_name,
+        last_name=last_name,
+        email=email,
+    )
     try:
         service.table("job_seekers").insert(data).execute()
         return True
@@ -307,13 +342,14 @@ def _auth_credentials(email: str, password: str) -> dict[str, str]:
     return {"email": email, "password": password}
 
 
-def _sign_in(service, email: str, password: str):
-    """Sign in via Supabase Auth using the service-role client (BFF pattern)."""
+def _sign_in(email: str, password: str):
+    """Sign in via Supabase Auth using the publishable/anon client (never the service client)."""
+    client = _anon_supabase()
     credentials = _auth_credentials(email, password)
     try:
-        return service.auth.sign_in_with_password(credentials)
+        return client.auth.sign_in_with_password(credentials)
     except TypeError:
-        return service.auth.sign_in_with_password(email=email, password=password)
+        return client.auth.sign_in_with_password(email=email, password=password)
 
 
 def _ensure_profile_row(service, user_id: str, payload) -> tuple[str, dict, dict | None]:
@@ -326,11 +362,12 @@ def _ensure_profile_row(service, user_id: str, payload) -> tuple[str, dict, dict
         }
     else:
         table_name = "job_seekers"
-        data = {
-            "id": user_id,
-            "first_name": payload.first_name,
-            "last_name": payload.last_name,
-        }
+        data = _job_seeker_row(
+            user_id,
+            first_name=payload.first_name,
+            last_name=payload.last_name,
+            email=str(payload.email),
+        )
 
     existing = service.table(table_name).select("id").eq("id", user_id).limit(1).execute()
     if existing.data:
@@ -385,7 +422,7 @@ def register_user(payload):
                 pass
             return profile_error
 
-        session_response = _sign_in(service, payload.email, payload.password)
+        session_response = _sign_in(payload.email, payload.password)
         session = getattr(session_response, "session", None)
         access_token = getattr(session, "access_token", None) if session else None
 
@@ -407,7 +444,7 @@ def login_user(payload):
     """Authenticates a user and retrieves a valid access token."""
     try:
         service = _service_supabase()
-        response = _sign_in(service, payload.email, payload.password)
+        response = _sign_in(payload.email, payload.password)
 
         access_token = getattr(response.session, "access_token", None)
         if not access_token:
@@ -415,6 +452,10 @@ def login_user(payload):
 
         user_id = UUID(str(response.user.id))
         account_type = _resolve_account_type(user_id)
+        if not account_type:
+            # Repair auth-only accounts left over from failed profile inserts.
+            if _provision_job_seeker_if_missing(user_id):
+                account_type = _resolve_account_type(user_id)
         if not account_type:
             return {
                 "error": (
