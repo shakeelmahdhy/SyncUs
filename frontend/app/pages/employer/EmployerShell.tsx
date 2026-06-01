@@ -1,5 +1,13 @@
 import type { ReactNode } from "react";
-import { BarChart3, BriefcaseBusiness, ClipboardList, LayoutDashboard, Search } from "lucide-react";
+import {
+  BarChart3,
+  BriefcaseBusiness,
+  ClipboardList,
+  LayoutDashboard,
+  Search,
+  UserPlus,
+  Users,
+} from "lucide-react";
 import { NavLink, useNavigate } from "react-router";
 import { clearAccessToken, getStoredAccessToken } from "../../lib/api";
 import { SyncUsMark } from "../../shared/components";
@@ -34,6 +42,9 @@ const employerLinks = [
   { label: "Dashboard", to: "/employer/dashboard", icon: LayoutDashboard },
   { label: "Post Job", to: "/employer/post-job", icon: BriefcaseBusiness },
   { label: "Applications", to: "/employer/review-applications", icon: ClipboardList },
+  { label: "Talent Pool", to: "/employer/talent-pool", icon: Users },
+  { label: "Hiring Team", to: "/employer/hiring-team", icon: UserPlus },
+  { label: "Analytics", to: "/employer/analytics", icon: BarChart3 },
 ];
 
 export function EmployerShell({ children }: { children: ReactNode }) {
@@ -71,10 +82,17 @@ export function EmployerShell({ children }: { children: ReactNode }) {
           <div className="my-8 h-px bg-white/30" />
 
           <div className="grid gap-3 text-sm font-bold text-white/72">
-            <span className="flex items-center gap-3 px-4">
+            <NavLink
+              className={({ isActive }) =>
+                `flex items-center gap-3 rounded-lg px-4 py-3 transition ${
+                  isActive ? "bg-white/14 text-syncus-cream" : "hover:bg-white/10 hover:text-syncus-cream"
+                }`
+              }
+              to="/employer/analytics"
+            >
               <BarChart3 size={16} />
               Matching Insights
-            </span>
+            </NavLink>
           </div>
         </aside>
 
