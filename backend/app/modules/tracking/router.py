@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter
 
-from app.core.auth import CurrentUserIdDep
+from app.core.auth import CandidateUserDep, CurrentUserDep, EmployerUserDep
 
 from .schema import (
     ApplicationCreateRequest,
@@ -26,22 +26,22 @@ router = APIRouter()
 @router.post("/applications", response_model=ApplicationResponse)
 def apply_to_job(
     payload: ApplicationCreateRequest,
-    user_id: CurrentUserIdDep,
+    current_candidate: CandidateUserDep,
 ) -> ApplicationResponse:
-    return create_application(user_id, payload)
+    return create_application(current_candidate.sub, payload)
 
 
 @router.get("/applications", response_model=ApplicationListResponse)
-def get_my_applications(user_id: CurrentUserIdDep) -> ApplicationListResponse:
-    return list_applications(user_id)
+def get_my_applications(current_candidate: CandidateUserDep) -> ApplicationListResponse:
+    return list_applications(current_candidate.sub)
 
 
 @router.get("/applications/{application_id}", response_model=ApplicationResponse)
 def get_application_detail(
     application_id: UUID,
-    user_id: CurrentUserIdDep,
+    current_candidate: CandidateUserDep,
 ) -> ApplicationResponse:
-    return get_application(user_id, application_id)
+    return get_application(current_candidate.sub, application_id)
 
 
 @router.patch(
@@ -51,11 +51,11 @@ def get_application_detail(
 def transition_application_status(
     application_id: UUID,
     payload: ApplicationStatusUpdateRequest,
-    user_id: CurrentUserIdDep,
+    current_user: CurrentUserDep,
 ) -> ApplicationStatusUpdateResponse:
-    return update_application_status(user_id, application_id, payload.status)
+    return update_application_status(current_user.sub, application_id, payload.status)
 
 
 @router.get("/jobs/{job_id}/pipeline", response_model=JobPipelineResponse)
-def get_pipeline(job_id: UUID, user_id: CurrentUserIdDep) -> JobPipelineResponse:
-    return get_job_pipeline(user_id, job_id)
+def get_pipeline(job_id: UUID, current_employer: EmployerUserDep) -> JobPipelineResponse:
+    return get_job_pipeline(current_employer.sub, job_id)
