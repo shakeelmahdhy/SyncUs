@@ -1,14 +1,27 @@
 import { useState } from "react";
-import { ArrowRight, CheckCircle2, Plus, Send } from "lucide-react";
+import { Save, X } from "lucide-react";
 import { useNavigate } from "react-router";
 import { createJob, publishJob, type CreateJobPayload, type WorkMode } from "../../lib/api";
 import { EmployerShell } from "./EmployerShell";
+
+const skillSuggestions = [
+  "React",
+  "TypeScript",
+  "Python",
+  "FastAPI",
+  "Figma",
+  "User Research",
+  "Product Strategy",
+  "SQL",
+  "Node.js",
+  "Agile",
+];
 
 const emptyJob = {
   title: "",
   company_name: "",
   description: "",
-  required_skills: "",
+  required_skills: [] as string[],
   location: "Sydney, NSW",
   work_mode: "hybrid" as WorkMode,
   education_level: "any",
@@ -33,10 +46,7 @@ function toPayload(form: JobForm): CreateJobPayload {
     title: form.title,
     company_name: form.company_name,
     description: form.description,
-    required_skills: form.required_skills
-      .split(",")
-      .map((skill) => skill.trim())
-      .filter(Boolean),
+    required_skills: form.required_skills,
     location: form.location,
     work_mode: form.work_mode,
     education_level: form.education_level,
@@ -58,11 +68,12 @@ export function EmployerPostJobPage() {
     company_name: "ThisCompany",
     description:
       "Join our hiring team as a Senior Product Designer responsible for research, design systems, prototyping, and partnering with product and engineering to ship accessible user experiences.",
-    required_skills: "Figma, User Research, Prototyping, Design Systems",
-    contact_email: "careers@thiscompany.com",
+    required_skills: ["Figma", "User Research", "Prototyping", "Design Systems"],
+    contact_email: "careers@FPT.com",
     salary_min: "120000",
     salary_max: "150000",
   });
+  const [skillDraft, setSkillDraft] = useState("");
   const [publishImmediately, setPublishImmediately] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -72,10 +83,42 @@ export function EmployerPostJobPage() {
     setForm((current) => ({ ...current, [key]: value }));
   };
 
+  const addSkill = (raw: string) => {
+    const parts = raw
+      .split(",")
+      .map((skill) => skill.trim())
+      .filter(Boolean);
+
+    if (parts.length === 0) return;
+
+    setForm((current) => {
+      const next = [...current.required_skills];
+      for (const skill of parts) {
+        const exists = next.some((item) => item.toLowerCase() === skill.toLowerCase());
+        if (!exists) next.push(skill);
+      }
+      return { ...current, required_skills: next };
+    });
+    setSkillDraft("");
+  };
+
+  const removeSkill = (skill: string) => {
+    setForm((current) => ({
+      ...current,
+      required_skills: current.required_skills.filter((item) => item !== skill),
+    }));
+  };
+
   const handleSubmit = async () => {
     setSaving(true);
     setError(null);
     setMessage(null);
+
+    if (form.required_skills.length === 0) {
+      setError("Add at least one required skill.");
+      setSaving(false);
+      return;
+    }
 
     try {
       const job = await createJob(toPayload(form));
@@ -93,14 +136,14 @@ export function EmployerPostJobPage() {
 
   return (
     <EmployerShell>
-      <header className="mb-8 max-w-[940px]">
-        <h1 className="font-serif text-[clamp(2.7rem,5vw,5rem)] leading-none tracking-normal">Post a New Job</h1>
-        <p className="mt-4 text-base font-medium text-syncus-blue/68">
-          Create a role in the jobs module, publish it, and make it available for tracking and AI candidate matching.
-        </p>
-      </header>
+      <div className="mx-auto w-3/4">
+        <header className="mb-8">
+          <h1 className="font-serif text-[clamp(2.7rem,5vw,5rem)] leading-none tracking-normal">Post a New Job</h1>
+          <p className="mt-4 text-base font-medium text-syncus-blue/68">
+            Create a role in the jobs module, publish it, and make it available for tracking and AI candidate matching.
+          </p>
+        </header>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <form
           className="rounded-[18px] border-2 border-syncus-blue bg-syncus-cream p-5 sm:p-7"
           onSubmit={(event) => {
@@ -133,15 +176,72 @@ export function EmployerPostJobPage() {
                 onChange={(event) => updateField("description", event.target.value)}
               />
             </label>
-            <label className="md:col-span-2">
-              <span className="mb-2 block text-xs font-black uppercase tracking-[0.08em] text-syncus-blue/55">Required skills</span>
-              <input
-                className="min-h-12 w-full rounded-lg border-2 border-syncus-blue/25 bg-syncus-cream px-4 font-bold outline-none focus:border-syncus-green"
-                value={form.required_skills}
-                onChange={(event) => updateField("required_skills", event.target.value)}
-                placeholder="React, TypeScript, Product Strategy"
-              />
-            </label>
+            <div className="md:col-span-2">
+              <span className="mb-2 block text-xs font-black uppercase tracking-[0.08em] text-syncus-blue/55">
+                Required skills
+              </span>
+              <div className="rounded-lg border-2 border-syncus-blue/25 bg-syncus-cream px-4 py-4">
+                {form.required_skills.length > 0 ? (
+                  <div className="mb-4 flex flex-wrap gap-2">
+                    {form.required_skills.map((skill) => (
+                      <span
+                        key={skill}
+                        className="inline-flex items-center gap-1.5 rounded-full border-2 border-syncus-green/40 bg-syncus-green/10 px-3 py-1.5 text-sm font-bold text-syncus-green"
+                      >
+                        {skill}
+                        <button
+                          type="button"
+                          className="grid h-5 w-5 place-items-center rounded-full text-syncus-green transition hover:bg-syncus-green/15"
+                          onClick={() => removeSkill(skill)}
+                          aria-label={`Remove ${skill}`}
+                        >
+                          <X size={12} strokeWidth={3} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mb-4 text-sm font-medium text-syncus-blue/50">No skills added yet.</p>
+                )}
+
+                <input
+                  className="min-h-11 w-full rounded-lg border-2 border-syncus-blue/25 bg-white px-4 text-sm font-bold text-syncus-blue outline-none focus:border-syncus-green"
+                  value={skillDraft}
+                  onChange={(event) => setSkillDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      addSkill(skillDraft);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (skillDraft.trim()) addSkill(skillDraft);
+                  }}
+                  placeholder="Type a skill and press Enter"
+                />
+
+                <p className="mt-4 text-xs font-bold uppercase tracking-[0.08em] text-syncus-blue/45">Suggestions</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {skillSuggestions
+                    .filter(
+                      (suggestion) =>
+                        !form.required_skills.some(
+                          (skill) => skill.toLowerCase() === suggestion.toLowerCase()
+                        )
+                    )
+                    .map((suggestion) => (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        className="rounded-full border-2 border-syncus-blue/20 px-3 py-1.5 text-xs font-bold text-syncus-blue transition hover:border-syncus-green hover:text-syncus-green"
+                        onClick={() => addSkill(suggestion)}
+                      >
+                        + {suggestion}
+                      </button>
+                    ))}
+                </div>
+              </div>
+            </div>
             <label>
               <span className="mb-2 block text-xs font-black uppercase tracking-[0.08em] text-syncus-blue/55">Location</span>
               <input
@@ -263,32 +363,13 @@ export function EmployerPostJobPage() {
               type="submit"
             >
               {saving ? "Saving..." : "Save Job"}
-              <Send size={16} />
+              <Save size={16} />
             </button>
           </div>
           {message && <p className="mt-4 text-sm font-black text-syncus-green">{message}</p>}
           {error && <p className="mt-4 text-sm font-black text-red-600">{error}</p>}
         </form>
-
-        <aside className="rounded-[18px] border-2 border-syncus-blue bg-syncus-blue p-6 text-syncus-cream">
-          <CheckCircle2 size={32} className="text-syncus-lime" />
-          <h2 className="mt-5 font-serif text-3xl leading-none">Connected workflow</h2>
-          <div className="mt-6 grid gap-4 text-sm font-medium text-white/78">
-            <p className="flex gap-3">
-              <Plus className="mt-0.5 shrink-0 text-syncus-lime" size={16} />
-              Create the role through the Jobs module.
-            </p>
-            <p className="flex gap-3">
-              <ArrowRight className="mt-0.5 shrink-0 text-syncus-lime" size={16} />
-              Published jobs feed candidate search and AI matching.
-            </p>
-            <p className="flex gap-3">
-              <CheckCircle2 className="mt-0.5 shrink-0 text-syncus-lime" size={16} />
-              New applications become visible in Review Applications.
-            </p>
-          </div>
-        </aside>
-      </section>
+      </div>
     </EmployerShell>
   );
 }
