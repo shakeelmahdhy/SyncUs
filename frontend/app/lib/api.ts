@@ -537,6 +537,26 @@ export function getCandidateRecommendations(jobId: string) {
   return request<CandidateRecommendation[]>(`/matching/jobs/${jobId}/candidates`);
 }
 
+export interface JobRecommendation {
+  job_id: string;
+  title: string;
+  location: string | null;
+  work_mode: string | null;
+  required_skills: string[];
+  score: number;
+  breakdown: {
+    skill?: number;
+    profile?: number;
+    experience?: number;
+    location?: number;
+    work_mode?: number;
+  };
+}
+
+export function getJobRecommendations() {
+  return request<JobRecommendation[]>("/matching/recommendations");
+}
+
 export function listProfileResumes() {
   const userId = getAuthenticatedUserId();
   if (!userId) {

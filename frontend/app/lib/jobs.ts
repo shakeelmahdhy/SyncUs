@@ -1,4 +1,5 @@
 import type { ApplicationStatus, BackendJob, SearchJobResult, TrackingApplication, WorkMode } from "./api";
+import { getJob, getJobRecommendations } from "./api";
 
 export interface Job {
   id: string;
@@ -29,9 +30,22 @@ export interface Application {
   title: string;
   company: string;
   location: string;
-  status: "Applied" | "Interviewing" | "Shortlisted" | "Rejected" | "Withdrawn";
+  status: "Applied" | "Interviewing" | "Shortlisted" | "Offered" | "Rejected" | "Withdrawn";
   appliedDate: string;
   matchScore: number;
+}
+
+export interface RecommendedRole {
+  jobId: string;
+  title: string;
+  company: string;
+  location: string;
+  workMode: string;
+  skills: string[];
+  matchScore: number;
+  description: string;
+  salary: string;
+  category: string;
 }
 
 const workModeLabels: Record<WorkMode, Job["locationMode"]> = {
@@ -183,10 +197,43 @@ const applicationStatusLabels: Record<ApplicationStatus, Application["status"]> 
   applied: "Applied",
   shortlisted: "Shortlisted",
   interview: "Interviewing",
-  offered: "Shortlisted",
+  offered: "Offered",
   rejected: "Rejected",
   withdrawn: "Withdrawn",
 };
+
+export async function fetchRecommendedRoles(): Promise<RecommendedRole[]> {
+  const recommendations = await getJobRecommendations();
+  if (recommendations.length === 0) return [];
+
+  const jobDetails = await Promise.allSettled(recommendations.map((item) => getJob(item.job_id)));
+
+  return recommendations.map((item, index) => {
+    const detail = jobDetails[index]?.status === "fulfilled" ? jobDetails[index].value : null;
+    const skills = item.required_skills.map(titleCaseSkill);
+    const location = item.location ?? detail?.location ?? "Location TBD";
+    const workMode = item.work_mode
+      ? workModeLabels[item.work_mode as WorkMode] ?? titleCaseSkill(item.work_mode)
+      : detail
+        ? workModeLabels[detail.work_mode]
+        : "Hybrid";
+
+    return {
+      jobId: item.job_id,
+      title: item.title,
+      company: detail?.company_name ?? "Employer",
+      location,
+      workMode,
+      skills,
+      matchScore: Math.round(item.score * 100),
+      description:
+        detail?.description ??
+        (skills.length ? `Required skills: ${skills.join(", ")}` : "Open role from SyncUs matching."),
+      salary: detail ? formatSalary(detail) : "Salary not listed",
+      category: detail ? inferCategory(detail) : "General",
+    };
+  });
+}
 
 export function toFrontendApplication(application: TrackingApplication, job?: Job): Application {
   return {
