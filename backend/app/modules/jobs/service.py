@@ -64,10 +64,16 @@ class JobService:
             applications_count=self._applications_count_for(row["id"]),
         )
 
-    async def create_job(self, job_data: JobCreate, employer_id: UUID) -> Job:
-        """Create a new job posting (DRAFT)."""
+    async def create_job(
+        self,
+        job_data: JobCreate,
+        employer_id: UUID,
+        *,
+        publish: bool = False,
+    ) -> Job:
+        """Create a new job posting (DRAFT, or PUBLISHED when ``publish=True``)."""
         try:
-            payload = job_create_to_row(job_data, employer_id)
+            payload = job_create_to_row(job_data, employer_id, publish=publish)
             response = self.db.table(JOBS_TABLE).insert(payload).execute()
 
             if not response.data:

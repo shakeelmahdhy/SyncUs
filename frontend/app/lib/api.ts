@@ -1,8 +1,20 @@
-const defaultApiBaseUrl =
-  typeof window !== "undefined"
-    ? `${window.location.protocol}//${window.location.hostname}:8000`
-    : "http://127.0.0.1:8000";
-const API_BASE_URL = ((import.meta as unknown) as { env: { VITE_API_BASE_URL?: string } }).env.VITE_API_BASE_URL ?? defaultApiBaseUrl;
+function resolveApiBaseUrl(): string {
+  const env = (import.meta as unknown as { env: { DEV?: boolean; VITE_API_BASE_URL?: string } }).env;
+  const configured = env.VITE_API_BASE_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/$/, "");
+  }
+  // Dev: same-origin requests; Vite proxies /jobs, /accounts, etc. to :8000 (avoids CORS).
+  if (env.DEV && typeof window !== "undefined") {
+    return "";
+  }
+  if (typeof window !== "undefined") {
+    return `${window.location.protocol}//${window.location.hostname}:8000`;
+  }
+  return "http://127.0.0.1:8000";
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 const AUTH_TOKEN_KEY = "syncus_access_token";
 const ACCOUNT_TYPE_KEY = "syncus_account_type";
 
@@ -112,14 +124,25 @@ async function parseApiError(response: Response) {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getStoredAccessToken();
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init?.headers,
-    },
-    ...init,
-  });
+  const url = `${API_BASE_URL}${path}`;
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...init?.headers,
+      },
+      ...init,
+    });
+  } catch {
+    const hint =
+      API_BASE_URL === ""
+        ? "Start the backend on port 8000 and restart the Vite dev server."
+        : `Check that the API is running at ${API_BASE_URL}.`;
+    throw new Error(`Cannot reach the SyncUs API. ${hint}`);
+  }
 
   if (!response.ok) {
     throw new Error(await parseApiError(response));
@@ -207,6 +230,18 @@ export function loginAccount(payload: LoginAccountPayload) {
 export type WorkMode = "remote" | "onsite" | "hybrid";
 export type JobStatus = "draft" | "published" | "closed";
 
+function normalizeJobStatus(status: unknown): JobStatus {
+  const value = String(status ?? "draft").toLowerCase();
+  if (value === "published" || value === "closed" || value === "draft") {
+    return value;
+  }
+  return "draft";
+}
+
+export function normalizeBackendJob(job: BackendJob): BackendJob {
+  return { ...job, status: normalizeJobStatus(job.status) };
+}
+
 export interface BackendJob {
   job_id: string;
   employer_id: string;
@@ -292,6 +327,9 @@ export interface JobSearchParams {
   keyword?: string;
   location?: string;
   work_mode?: WorkMode;
+  employment_type?: string;
+  education_level?: string;
+  experience_level?: string;
   skills?: string[];
   page?: number;
   page_size?: number;
@@ -303,6 +341,9 @@ export function searchJobs(params: JobSearchParams = {}) {
   if (params.keyword) searchParams.set("keyword", params.keyword);
   if (params.location) searchParams.set("location", params.location);
   if (params.work_mode) searchParams.set("work_mode", params.work_mode);
+  if (params.employment_type) searchParams.set("employment_type", params.employment_type);
+  if (params.education_level) searchParams.set("education_level", params.education_level);
+  if (params.experience_level) searchParams.set("experience_level", params.experience_level);
   if (params.skills?.length) searchParams.set("skills", params.skills.join(","));
   if (params.page) searchParams.set("page", String(params.page));
   if (params.page_size) searchParams.set("page_size", String(params.page_size));
@@ -317,6 +358,9 @@ export function searchJobDiscovery(params: JobSearchParams & { sort_by?: "newest
   if (params.keyword) searchParams.set("keyword", params.keyword);
   if (params.location) searchParams.set("location", params.location);
   if (params.work_mode) searchParams.set("work_mode", params.work_mode);
+  if (params.employment_type) searchParams.set("employment_type", params.employment_type);
+  if (params.education_level) searchParams.set("education_level", params.education_level);
+  if (params.experience_level) searchParams.set("experience_level", params.experience_level);
   if (params.skills?.length) searchParams.set("skills", params.skills.join(","));
   if (params.page) searchParams.set("page", String(params.page));
   if (params.page_size) searchParams.set("page_size", String(params.page_size));
@@ -326,10 +370,20 @@ export function searchJobDiscovery(params: JobSearchParams & { sort_by?: "newest
   return request<SearchJobResponse>(`/search/jobs${query ? `?${query}` : ""}`);
 }
 
-export function searchCandidates(params: { skills?: string[]; page?: number; page_size?: number } = {}) {
+export function searchCandidates(params: {
+  keyword?: string;
+  skills?: string[];
+  location?: string;
+  available_for?: string;
+  page?: number;
+  page_size?: number;
+} = {}) {
   const searchParams = new URLSearchParams();
 
+  if (params.keyword) searchParams.set("keyword", params.keyword);
   if (params.skills?.length) searchParams.set("skills", params.skills.join(","));
+  if (params.location) searchParams.set("location", params.location);
+  if (params.available_for) searchParams.set("available_for", params.available_for);
   if (params.page) searchParams.set("page", String(params.page));
   if (params.page_size) searchParams.set("page_size", String(params.page_size));
 
@@ -338,7 +392,7 @@ export function searchCandidates(params: { skills?: string[]; page?: number; pag
 }
 
 export function getJob(jobId: string) {
-  return request<BackendJob>(`/jobs/${jobId}`);
+  return request<BackendJob>(`/jobs/${jobId}`).then(normalizeBackendJob);
 }
 
 export interface CreateJobPayload {
@@ -406,10 +460,26 @@ export interface CandidateRecommendation {
   };
 }
 
-export function createJob(payload: CreateJobPayload) {
-  return request<BackendJob>("/jobs", {
+export type UpdateJobPayload = CreateJobPayload;
+
+export function createJob(payload: CreateJobPayload, options?: { publish?: boolean }) {
+  const query = options?.publish ? "?publish=true" : "";
+  return request<BackendJob>(`/jobs${query}`, {
     method: "POST",
     body: JSON.stringify(payload),
+  }).then(normalizeBackendJob);
+}
+
+export function updateJob(jobId: string, payload: UpdateJobPayload) {
+  return request<BackendJob>(`/jobs/${jobId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  }).then(normalizeBackendJob);
+}
+
+export function deleteJob(jobId: string) {
+  return request<{ message: string }>(`/jobs/${jobId}`, {
+    method: "DELETE",
   });
 }
 
@@ -428,7 +498,29 @@ export function getEmployerJobs(params: { status_filter?: JobStatus; page?: numb
   if (params.page_size) searchParams.set("page_size", String(params.page_size));
 
   const query = searchParams.toString();
-  return request<JobListResponse>(`/jobs/employer/my-jobs${query ? `?${query}` : ""}`);
+  return request<JobListResponse>(`/jobs/employer/my-jobs${query ? `?${query}` : ""}`).then(
+    (response) => ({
+      ...response,
+      jobs: dedupeEmployerJobs(response.jobs.map(normalizeBackendJob)),
+    })
+  );
+}
+
+function dedupeEmployerJobs(jobs: BackendJob[]) {
+  const byId = new Map<string, BackendJob>();
+  for (const job of jobs) {
+    const existing = byId.get(job.job_id);
+    if (!existing) {
+      byId.set(job.job_id, job);
+      continue;
+    }
+    const rank = (status: JobStatus) =>
+      status === "published" ? 2 : status === "draft" ? 1 : 0;
+    if (rank(job.status) > rank(existing.status)) {
+      byId.set(job.job_id, job);
+    }
+  }
+  return [...byId.values()];
 }
 
 export function getEmployerJobStats() {
@@ -464,6 +556,26 @@ export function getCandidateRecommendations(jobId: string) {
   return request<CandidateRecommendation[]>(`/matching/jobs/${jobId}/candidates`);
 }
 
+export interface JobRecommendation {
+  job_id: string;
+  title: string;
+  location: string | null;
+  work_mode: string | null;
+  required_skills: string[];
+  score: number;
+  breakdown: {
+    skill?: number;
+    profile?: number;
+    experience?: number;
+    location?: number;
+    work_mode?: number;
+  };
+}
+
+export function getJobRecommendations() {
+  return request<JobRecommendation[]>("/matching/recommendations");
+}
+
 export function listProfileResumes() {
   const userId = getAuthenticatedUserId();
   if (!userId) {
@@ -482,11 +594,21 @@ export async function uploadProfileResume(file: File) {
   const body = new FormData();
   body.append("file", file);
 
-  const response = await fetch(`${API_BASE_URL}/accounts/profile/${userId}/resume/upload`, {
-    method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body,
-  });
+  const url = `${API_BASE_URL}/accounts/profile/${userId}/resume/upload`;
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body,
+    });
+  } catch {
+    const hint =
+      API_BASE_URL === ""
+        ? "Start the backend on port 8000 and restart the Vite dev server."
+        : `Check that the API is running at ${API_BASE_URL}.`;
+    throw new Error(`Cannot reach the SyncUs API. ${hint}`);
+  }
 
   if (!response.ok) {
     throw new Error(await parseApiError(response));

@@ -1,15 +1,31 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Briefcase, CheckCircle2, ChevronLeft, ChevronRight, Filter, MapPin, Search, X } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import { searchJobDiscovery } from '../lib/api';
+import { searchJobDiscovery, type WorkMode } from '../lib/api';
 import { type Job, toFrontendSearchJob } from '../lib/jobs';
 
 const jobTypes = ['Full-Time', 'Part-Time', 'Casual', 'Contract'];
 const locationModes = ['On-site', 'Remote', 'Hybrid'];
+const experienceLevels = ['Entry-Level', 'Junior', 'Mid-Level', 'Senior', 'Lead'];
 const JOBS_PER_PAGE = 3;
 
 function normalise(value: string) {
   return value.toLowerCase().replace(/\s+/g, '').replace(/-/g, '');
+}
+
+function toWorkMode(mode: string): WorkMode | undefined {
+  const value = normalise(mode);
+  if (value === 'remote') return 'remote';
+  if (value === 'onsite') return 'onsite';
+  if (value === 'hybrid') return 'hybrid';
+  return undefined;
+}
+
+function toExperienceLevel(level: string) {
+  const value = normalise(level);
+  if (value === 'entrylevel') return 'entry';
+  if (value === 'midlevel') return 'mid';
+  return value;
 }
 
 function FilterCheckbox({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
@@ -81,6 +97,7 @@ export function LandingPage() {
   const [location, setLocation] = useState('');
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [selectedModes, setSelectedModes] = useState<string[]>([]);
+  const [selectedExperience, setSelectedExperience] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
@@ -89,28 +106,44 @@ export function LandingPage() {
 
   useEffect(() => {
     let isMounted = true;
+    const timeout = window.setTimeout(() => {
+      const singleMode = selectedModes.length === 1 ? toWorkMode(selectedModes[0]) : undefined;
+      const singleType = selectedTypes.length === 1 ? selectedTypes[0].toLowerCase() : undefined;
+      const singleExperience =
+        selectedExperience.length === 1 ? toExperienceLevel(selectedExperience[0]) : undefined;
 
-    searchJobDiscovery({ page_size: 100 })
-      .then((response) => {
-        if (!isMounted) return;
-        setAvailableJobs(response.results.map(toFrontendSearchJob));
-        setJobsError(null);
+      setLoadingJobs(true);
+      searchJobDiscovery({
+        keyword: search.trim() || undefined,
+        location: location.trim() || undefined,
+        work_mode: singleMode,
+        employment_type: singleType,
+        experience_level: singleExperience,
+        sort_by: 'relevance',
+        page_size: 100,
       })
-      .catch((error) => {
-        if (!isMounted) return;
-        setAvailableJobs([]);
-        setJobsError(error instanceof Error ? error.message : 'Jobs API is unavailable.');
-      })
-      .finally(() => {
-        if (isMounted) {
-          setLoadingJobs(false);
-        }
-      });
+        .then((response) => {
+          if (!isMounted) return;
+          setAvailableJobs(response.results.map(toFrontendSearchJob));
+          setJobsError(null);
+        })
+        .catch((error) => {
+          if (!isMounted) return;
+          setAvailableJobs([]);
+          setJobsError(error instanceof Error ? error.message : 'Jobs API is unavailable.');
+        })
+        .finally(() => {
+          if (isMounted) {
+            setLoadingJobs(false);
+          }
+        });
+    }, 250);
 
     return () => {
       isMounted = false;
+      window.clearTimeout(timeout);
     };
-  }, []);
+  }, [location, search, selectedExperience, selectedModes, selectedTypes]);
 
   const filtered = useMemo(() => {
     return availableJobs.filter((job) => {
@@ -120,9 +153,12 @@ export function LandingPage() {
       const matchesLocation = !locationQuery || job.location.toLowerCase().includes(locationQuery);
       const matchesType = selectedTypes.length === 0 || selectedTypes.some((type) => normalise(type) === normalise(job.workType));
       const matchesMode = selectedModes.length === 0 || selectedModes.some((mode) => normalise(mode) === normalise(job.locationMode));
-      return matchesSearch && matchesLocation && matchesType && matchesMode;
+      const matchesExperience =
+        selectedExperience.length === 0 ||
+        selectedExperience.some((level) => normalise(job.experience).includes(normalise(level).replace('level', '')));
+      return matchesSearch && matchesLocation && matchesType && matchesMode && matchesExperience;
     });
-  }, [availableJobs, location, search, selectedModes, selectedTypes]);
+  }, [availableJobs, location, search, selectedExperience, selectedModes, selectedTypes]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / JOBS_PER_PAGE));
   const visiblePage = Math.min(currentPage, totalPages);
@@ -138,9 +174,15 @@ export function LandingPage() {
     setCurrentPage(1);
   };
 
+  const toggleExperience = (level: string) => {
+    setSelectedExperience((current) => (current.includes(level) ? current.filter((item) => item !== level) : [...current, level]));
+    setCurrentPage(1);
+  };
+
   const clearFilters = () => {
     setSelectedTypes([]);
     setSelectedModes([]);
+    setSelectedExperience([]);
     setLocation('');
     setSearch('');
     setCurrentPage(1);
@@ -211,7 +253,21 @@ export function LandingPage() {
               </div>
             </div>
 
-            {(selectedTypes.length > 0 || selectedModes.length > 0 || location || search) && (
+            <div className="mt-5">
+              <p className="mb-3 text-sm font-bold text-syncus-green">Experience</p>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+                {experienceLevels.map((level) => (
+                  <FilterCheckbox
+                    key={level}
+                    label={level}
+                    checked={selectedExperience.includes(level)}
+                    onChange={() => toggleExperience(level)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {(selectedTypes.length > 0 || selectedModes.length > 0 || selectedExperience.length > 0 || location || search) && (
               <button className="mt-6 flex items-center gap-1 text-xs font-bold text-syncus-green underline underline-offset-4" type="button" onClick={clearFilters}>
                 <X size={13} /> Clear all filters
               </button>

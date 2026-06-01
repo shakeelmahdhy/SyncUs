@@ -24,15 +24,16 @@ def get_search_service() -> SearchService:
     response_model=JobSearchResponse,
     summary="Search job postings",
     description=(
-        "Full-text search across published job postings. "
-        "Keyword matches job title and description. "
-        "Skills filter returns jobs that require at least one of the listed skills."
+        "Enhanced search across published job postings. "
+        "Keyword search considers titles, descriptions, employers, skills, experience, locations, and work preferences. "
+        "Fuzzy matching handles common typos and related terms."
     ),
 )
 async def search_jobs(
-    keyword: Optional[str] = Query(None, description="Search keyword (matches title and description)"),
+    keyword: Optional[str] = Query(None, description="Search keyword, including fuzzy or related terms"),
     location: Optional[str] = Query(None, description="Filter by location"),
     work_mode: Optional[str] = Query(None, description="remote | onsite | hybrid"),
+    employment_type: Optional[str] = Query(None, description="full-time | part-time | casual | contract"),
     education_level: Optional[str] = Query(None, description="any | bachelor | master | phd"),
     experience_level: Optional[str] = Query(None, description="entry | junior | mid | senior"),
     skills: Optional[str] = Query(None, description="Comma-separated skills, e.g. react,python"),
@@ -46,7 +47,7 @@ async def search_jobs(
     """
     Search for published job postings.
 
-    - **keyword**: Searches both title and description (partial match supported)
+    - **keyword**: Searches job, employer, skill, experience, location, and work preference text
     - **skills**: Comma-separated, e.g. `react,python,fastapi`
     - **sort_by**: `newest` (default), `oldest`, or `relevance`
     """
@@ -58,6 +59,7 @@ async def search_jobs(
         keyword=keyword,
         location=location,
         work_mode=work_mode,
+        employment_type=employment_type,
         education_level=education_level,
         experience_level=experience_level,
         skills=skills_list,
@@ -83,6 +85,7 @@ async def search_jobs(
 )
 async def filter_candidates(
     current_employer: EmployerUserDep,
+    keyword: Optional[str] = Query(None, description="Search candidate names, skills, education, experience, and preferences"),
     skills: Optional[str] = Query(None, description="Comma-separated skill tags, e.g. react,python"),
     education_level: Optional[str] = Query(None, description="any | bachelor | master | phd"),
     major: Optional[str] = Query(None, description="Field of study, e.g. Computer Science"),
@@ -107,6 +110,7 @@ async def filter_candidates(
         skills_list = [s.strip() for s in skills.split(",") if s.strip()]
 
     request = CandidateFilterRequest(
+        keyword=keyword,
         skill_tags=skills_list,
         education_level=education_level,
         major=major,
