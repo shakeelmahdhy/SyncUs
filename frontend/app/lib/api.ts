@@ -1,8 +1,20 @@
-const defaultApiBaseUrl =
-  typeof window !== "undefined"
-    ? `${window.location.protocol}//${window.location.hostname}:8000`
-    : "http://127.0.0.1:8000";
-const API_BASE_URL = ((import.meta as unknown) as { env: { VITE_API_BASE_URL?: string } }).env.VITE_API_BASE_URL ?? defaultApiBaseUrl;
+function resolveApiBaseUrl(): string {
+  const env = (import.meta as unknown as { env: { DEV?: boolean; VITE_API_BASE_URL?: string } }).env;
+  const configured = env.VITE_API_BASE_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/$/, "");
+  }
+  // Dev: same-origin requests; Vite proxies /jobs, /accounts, etc. to :8000 (avoids CORS).
+  if (env.DEV && typeof window !== "undefined") {
+    return "";
+  }
+  if (typeof window !== "undefined") {
+    return `${window.location.protocol}//${window.location.hostname}:8000`;
+  }
+  return "http://127.0.0.1:8000";
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 const AUTH_TOKEN_KEY = "syncus_access_token";
 const ACCOUNT_TYPE_KEY = "syncus_account_type";
 
@@ -112,14 +124,25 @@ async function parseApiError(response: Response) {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getStoredAccessToken();
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init?.headers,
-    },
-    ...init,
-  });
+  const url = `${API_BASE_URL}${path}`;
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...init?.headers,
+      },
+      ...init,
+    });
+  } catch {
+    const hint =
+      API_BASE_URL === ""
+        ? "Start the backend on port 8000 and restart the Vite dev server."
+        : `Check that the API is running at ${API_BASE_URL}.`;
+    throw new Error(`Cannot reach the SyncUs API. ${hint}`);
+  }
 
   if (!response.ok) {
     throw new Error(await parseApiError(response));
@@ -482,11 +505,21 @@ export async function uploadProfileResume(file: File) {
   const body = new FormData();
   body.append("file", file);
 
-  const response = await fetch(`${API_BASE_URL}/accounts/profile/${userId}/resume/upload`, {
-    method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body,
-  });
+  const url = `${API_BASE_URL}/accounts/profile/${userId}/resume/upload`;
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body,
+    });
+  } catch {
+    const hint =
+      API_BASE_URL === ""
+        ? "Start the backend on port 8000 and restart the Vite dev server."
+        : `Check that the API is running at ${API_BASE_URL}.`;
+    throw new Error(`Cannot reach the SyncUs API. ${hint}`);
+  }
 
   if (!response.ok) {
     throw new Error(await parseApiError(response));

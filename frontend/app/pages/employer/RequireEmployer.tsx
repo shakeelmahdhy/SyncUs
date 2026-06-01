@@ -17,7 +17,12 @@ export function RequireEmployer({ children }: { children: ReactNode }) {
       .then(() => {
         if (isMounted) setAllowed(true);
       })
-      .catch(() => {
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : "";
+        if (message.includes("Cannot reach the SyncUs API")) {
+          if (isMounted) setAllowed(true);
+          return;
+        }
         clearAccessToken();
         if (isMounted) setAllowed(false);
       });

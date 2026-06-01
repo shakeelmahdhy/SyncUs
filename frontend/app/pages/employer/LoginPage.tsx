@@ -36,7 +36,12 @@ export function EmployerLoginPage() {
 
       try {
         await getEmployerJobStats();
-      } catch {
+      } catch (statsError) {
+        const message = statsError instanceof Error ? statsError.message : "";
+        if (message.includes("Cannot reach the SyncUs API")) {
+          setError(message);
+          return;
+        }
         clearAccessToken();
         setError("This account is not registered as an employer.");
         return;
