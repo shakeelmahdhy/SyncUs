@@ -1,7 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Save, X } from "lucide-react";
-import { useNavigate } from "react-router";
-import { createJob, publishJob, type CreateJobPayload, type WorkMode } from "../../lib/api";
+import { useNavigate, useSearchParams } from "react-router";
+import {
+  createJob,
+  getJob,
+  publishJob,
+  updateJob,
+  type BackendJob,
+  type CreateJobPayload,
+  type WorkMode,
+} from "../../lib/api";
 import { EmployerShell } from "./EmployerShell";
 
 const skillSuggestions = [
@@ -60,24 +68,72 @@ function toPayload(form: JobForm): CreateJobPayload {
   };
 }
 
+function numberToField(value: number | null | undefined) {
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function jobToForm(job: BackendJob): JobForm {
+  return {
+    title: job.title,
+    company_name: job.company_name,
+    description: job.description,
+    required_skills: job.required_skills,
+    location: job.location,
+    work_mode: job.work_mode,
+    education_level: job.education_level,
+    experience_level: job.experience_level,
+    min_years_experience: numberToField(job.min_years_experience),
+    max_years_experience: numberToField(job.max_years_experience),
+    salary_min: numberToField(job.salary_min),
+    salary_max: numberToField(job.salary_max),
+    contact_email: job.contact_email,
+    website: job.website ?? "",
+  };
+}
+
 export function EmployerPostJobPage() {
   const navigate = useNavigate();
-  const [form, setForm] = useState<JobForm>({
-    ...emptyJob,
-    title: "Senior Product Designer",
-    company_name: "ThisCompany",
-    description:
-      "Join our hiring team as a Senior Product Designer responsible for research, design systems, prototyping, and partnering with product and engineering to ship accessible user experiences.",
-    required_skills: ["Figma", "User Research", "Prototyping", "Design Systems"],
-    contact_email: "careers@FPT.com",
-    salary_min: "120000",
-    salary_max: "150000",
-  });
+  const [searchParams] = useSearchParams();
+  const editJobId = searchParams.get("edit");
+  const isEditing = Boolean(editJobId);
+
+  const [form, setForm] = useState<JobForm>(emptyJob);
   const [skillDraft, setSkillDraft] = useState("");
-  const [publishImmediately, setPublishImmediately] = useState(true);
+  const [publishImmediately, setPublishImmediately] = useState(false);
+  const [loadingJob, setLoadingJob] = useState(isEditing);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!editJobId) return;
+
+    let isMounted = true;
+    setLoadingJob(true);
+    setError(null);
+
+    getJob(editJobId)
+      .then((job) => {
+        if (!isMounted) return;
+        if (job.status !== "draft") {
+          setError("Only draft jobs can be edited. Publish or close jobs from the dashboard.");
+          return;
+        }
+        setForm(jobToForm(job));
+        setPublishImmediately(false);
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        setError(err instanceof Error ? err.message : "Could not load draft job.");
+      })
+      .finally(() => {
+        if (isMounted) setLoadingJob(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [editJobId]);
 
   const updateField = (key: keyof JobForm, value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -121,14 +177,33 @@ export function EmployerPostJobPage() {
     }
 
     try {
-      const job = await createJob(toPayload(form));
-      if (publishImmediately) {
-        await publishJob(job.job_id);
+      const payload = toPayload(form);
+      let job: BackendJob;
+
+      if (isEditing && editJobId) {
+        job = await updateJob(editJobId, payload);
+        if (publishImmediately) {
+          await publishJob(job.job_id);
+        }
+      } else if (publishImmediately) {
+        job = await createJob(payload, { publish: true });
+      } else {
+        job = await createJob(payload);
       }
-      setMessage(publishImmediately ? "Job posted and published." : "Job saved as a draft.");
+
+      if (isEditing) {
+        setMessage(publishImmediately ? "Draft updated and published." : "Draft updated.");
+      } else {
+        setMessage(publishImmediately ? "Job posted and published." : "Job saved as a draft.");
+      }
       window.setTimeout(() => navigate("/employer/dashboard"), 700);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Job could not be saved.");
+      const message = err instanceof Error ? err.message : "Job could not be saved.";
+      if (isEditing && editJobId && publishImmediately) {
+        setError(`${message} Your draft was saved; try Publish on the dashboard.`);
+      } else {
+        setError(message);
+      }
     } finally {
       setSaving(false);
     }
@@ -138,12 +213,21 @@ export function EmployerPostJobPage() {
     <EmployerShell>
       <div className="mx-auto w-3/4">
         <header className="mb-8">
-          <h1 className="font-serif text-[clamp(2.7rem,5vw,5rem)] leading-none tracking-normal">Post a New Job</h1>
+          <h1 className="font-serif text-[clamp(2.7rem,5vw,5rem)] leading-none tracking-normal">
+            {isEditing ? "Edit Draft Job" : "Post a New Job"}
+          </h1>
           <p className="mt-4 text-base font-medium text-syncus-blue/68">
-            Create a role in the jobs module, publish it, and make it available for tracking and AI candidate matching.
+            {isEditing
+              ? "Update your draft, save changes, or publish when you are ready for applicants and AI matching."
+              : "Create a role, save as draft, or publish immediately for tracking and AI candidate matching."}
           </p>
         </header>
 
+        {loadingJob ? (
+          <p className="rounded-[18px] border-2 border-syncus-blue/25 bg-syncus-cream px-6 py-10 text-center text-sm font-black text-syncus-blue/60">
+            Loading draft...
+          </p>
+        ) : (
         <form
           className="rounded-[18px] border-2 border-syncus-blue bg-syncus-cream p-5 sm:p-7"
           onSubmit={(event) => {
@@ -355,20 +439,21 @@ export function EmployerPostJobPage() {
                 onChange={(event) => setPublishImmediately(event.target.checked)}
                 type="checkbox"
               />
-              Publish immediately
+              {isEditing ? "Publish after saving" : "Publish immediately"}
             </label>
             <button
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-syncus-blue px-7 text-sm font-black text-syncus-cream transition hover:-translate-y-0.5 disabled:opacity-60"
-              disabled={saving}
+              disabled={saving || loadingJob}
               type="submit"
             >
-              {saving ? "Saving..." : "Save Job"}
+              {saving ? "Saving..." : publishImmediately ? "Save & Publish" : isEditing ? "Save Draft" : "Save Job"}
               <Save size={16} />
             </button>
           </div>
           {message && <p className="mt-4 text-sm font-black text-syncus-green">{message}</p>}
           {error && <p className="mt-4 text-sm font-black text-red-600">{error}</p>}
         </form>
+        )}
       </div>
     </EmployerShell>
   );

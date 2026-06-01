@@ -1,11 +1,24 @@
-import { useEffect, useMemo, useState } from "react";
-import { Bot, BriefcaseBusiness, CalendarDays, Download, Eye, Star, Users } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Bot,
+  BriefcaseBusiness,
+  CalendarDays,
+  Download,
+  Eye,
+  FilePenLine,
+  Send,
+  Star,
+  Trash2,
+  Users,
+} from "lucide-react";
 import { useNavigate } from "react-router";
 import {
+  deleteJob,
   getCandidateRecommendations,
   getEmployerJobs,
   getEmployerJobStats,
   getJobPipeline,
+  publishJob,
   type BackendJob,
   type CandidateRecommendation,
   type JobStatsResponse,
@@ -32,54 +45,58 @@ export function EmployerDashboardPage() {
   const [candidateMatches, setCandidateMatches] = useState<Record<string, CandidateRecommendation[]>>({});
   const [interviewCount, setInterviewCount] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
+  const [actionJobId, setActionJobId] = useState<string | null>(null);
+
+  const loadDashboard = useCallback(async () => {
+    const [jobResponse, statsResponse] = await Promise.all([
+      getEmployerJobs({ page_size: 50 }),
+      getEmployerJobStats(),
+    ]);
+
+    const liveJobs = jobResponse.jobs;
+    setJobs(liveJobs);
+    setStats(statsResponse);
+    setNotice(null);
+
+    const publishedJobs = liveJobs.filter((job) => job.status === "published");
+    const topJobs = publishedJobs.slice(0, 3);
+
+    const pipelines = await Promise.allSettled(topJobs.map((job) => getJobPipeline(job.job_id)));
+    setInterviewCount(
+      pipelines.reduce((count, result) => {
+        if (result.status !== "fulfilled") return count;
+        return count + result.value.applications.filter((application) => application.status === "interview").length;
+      }, 0)
+    );
+
+    const matches = await Promise.allSettled(topJobs.map((job) => getCandidateRecommendations(job.job_id)));
+    setCandidateMatches(
+      Object.fromEntries(
+        matches.map((result, index) => [
+          topJobs[index]?.job_id,
+          result.status === "fulfilled" ? result.value : [],
+        ])
+      )
+    );
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
 
-    Promise.all([getEmployerJobs({ page_size: 20 }), getEmployerJobStats()])
-      .then(async ([jobResponse, statsResponse]) => {
-        if (!isMounted) return;
-        const liveJobs = jobResponse.jobs;
-        setJobs(liveJobs);
-        setStats(statsResponse);
-        setNotice(null);
-
-        const topJobs = liveJobs.slice(0, 3);
-        const pipelines = await Promise.allSettled(topJobs.map((job) => getJobPipeline(job.job_id)));
-        if (isMounted) {
-          setInterviewCount(
-            pipelines.reduce((count, result) => {
-              if (result.status !== "fulfilled") return count;
-              return count + result.value.applications.filter((application) => application.status === "interview").length;
-            }, 0)
-          );
-        }
-
-        const matches = await Promise.allSettled(topJobs.map((job) => getCandidateRecommendations(job.job_id)));
-        if (isMounted) {
-          setCandidateMatches(
-            Object.fromEntries(
-              matches.map((result, index) => [
-                topJobs[index]?.job_id,
-                result.status === "fulfilled" ? result.value : [],
-              ])
-            )
-          );
-        }
-      })
-      .catch((error) => {
-        if (!isMounted) return;
-        setJobs([]);
-        setStats(null);
-        setNotice(error instanceof Error ? error.message : "Employer APIs are unavailable.");
-      });
+    loadDashboard().catch((error) => {
+      if (!isMounted) return;
+      setJobs([]);
+      setStats(null);
+      setNotice(error instanceof Error ? error.message : "Employer APIs are unavailable.");
+    });
 
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [loadDashboard]);
 
-  const activeJobs = jobs.filter((job) => job.status === "published");
+  const publishedJobs = useMemo(() => jobs.filter((job) => job.status === "published"), [jobs]);
+  const draftJobs = useMemo(() => jobs.filter((job) => job.status === "draft"), [jobs]);
   const applicants = stats?.total_applications ?? jobs.reduce((sum, job) => sum + job.applications_count, 0);
   const averageMatch = useMemo(() => {
     const scores = Object.values(candidateMatches)
@@ -90,6 +107,36 @@ export function EmployerDashboardPage() {
     return Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length);
   }, [candidateMatches]);
 
+  const handlePublishDraft = async (jobId: string) => {
+    setActionJobId(jobId);
+    setNotice(null);
+    try {
+      await publishJob(jobId);
+      await loadDashboard();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not publish draft.");
+    } finally {
+      setActionJobId(null);
+    }
+  };
+
+  const handleDeleteDraft = async (job: BackendJob) => {
+    if (!window.confirm(`Delete draft "${job.title}"? This cannot be undone.`)) {
+      return;
+    }
+
+    setActionJobId(job.job_id);
+    setNotice(null);
+    try {
+      await deleteJob(job.job_id);
+      await loadDashboard();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not delete draft.");
+    } finally {
+      setActionJobId(null);
+    }
+  };
+
   return (
     <EmployerShell>
       <header className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -98,7 +145,7 @@ export function EmployerDashboardPage() {
             Dashboard Overview
           </h1>
           <p className="mt-4 text-base font-medium text-syncus-blue">
-            Welcome back, John. Here is what is happening with your hiring pipeline today.
+            Welcome back. Here is what is happening with your hiring pipeline today.
           </p>
           {notice && <p className="mt-2 text-sm font-bold text-red-600">{notice}</p>}
         </div>
@@ -114,27 +161,104 @@ export function EmployerDashboardPage() {
         </div>
       </header>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={BriefcaseBusiness} label="Active Postings" value={stats?.published_count ?? activeJobs.length} />
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <StatCard icon={BriefcaseBusiness} label="Active Postings" value={stats?.published_count ?? publishedJobs.length} />
+        <StatCard icon={FilePenLine} label="Draft Jobs" value={stats?.draft_count ?? draftJobs.length} hint="Unpublished postings" />
         <StatCard icon={Users} label="Total Applicants" value={applicants} />
         <StatCard icon={Star} label="Shortlisted" value={Math.max(0, applicants ? Math.round(applicants * 0.2) : 0)} />
         <StatCard icon={Bot} label="AI Match Score" value={`${averageMatch}%`} hint="Avg. match quality across active roles" />
       </section>
 
+      {draftJobs.length > 0 && (
+        <section className="mt-9">
+          <h2 className="font-serif text-[clamp(2rem,3vw,2.8rem)] leading-none text-syncus-blue">
+            Draft Jobs ({draftJobs.length})
+          </h2>
+          <p className="mt-2 text-sm font-medium text-syncus-blue/60">
+            Drafts are only visible to you until you publish them.
+          </p>
+          <div className="mt-5 grid gap-4">
+            {draftJobs.map((job) => {
+              const busy = actionJobId === job.job_id;
+              return (
+                <article
+                  key={job.job_id}
+                  className="grid gap-4 rounded-[18px] border-2 border-dashed border-syncus-blue/45 bg-syncus-cream/80 px-5 py-4 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center"
+                >
+                  <span className="grid h-12 w-12 place-items-center rounded-xl bg-syncus-blue/15 text-syncus-blue">
+                    <FilePenLine size={21} />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="truncate text-2xl font-medium leading-tight text-syncus-blue">{job.title}</h3>
+                      <span className="rounded-full border-2 border-syncus-blue/30 bg-white px-2.5 py-0.5 text-[0.65rem] font-black uppercase tracking-[0.12em] text-syncus-blue/70">
+                        Draft
+                      </span>
+                    </div>
+                    <p className="text-sm font-medium text-syncus-blue/70">
+                      {job.company_name} · {job.location}
+                    </p>
+                    <p className="mt-1 text-xs font-bold text-syncus-blue/50">
+                      Last updated {new Date(job.updated_at).toLocaleDateString("en-AU")}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border-2 border-syncus-blue px-4 text-sm font-black text-syncus-blue transition hover:bg-syncus-blue/5 disabled:opacity-60"
+                      disabled={busy}
+                      onClick={() => navigate(`/employer/post-job?edit=${job.job_id}`)}
+                      type="button"
+                    >
+                      <FilePenLine size={15} />
+                      Edit
+                    </button>
+                    <button
+                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-syncus-green px-4 text-sm font-black text-syncus-cream transition hover:-translate-y-0.5 disabled:opacity-60"
+                      disabled={busy}
+                      onClick={() => void handlePublishDraft(job.job_id)}
+                      type="button"
+                    >
+                      <Send size={15} />
+                      {busy ? "Publishing..." : "Publish"}
+                    </button>
+                    <button
+                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border-2 border-red-300 px-4 text-sm font-black text-red-700 transition hover:bg-red-50 disabled:opacity-60"
+                      disabled={busy}
+                      onClick={() => void handleDeleteDraft(job)}
+                      type="button"
+                    >
+                      <Trash2 size={15} />
+                      Delete
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       <section className="mt-9">
         <h2 className="font-serif text-[clamp(2rem,3vw,2.8rem)] leading-none text-syncus-blue">
-          Active Job Postings ({activeJobs.length || jobs.length})
+          Active Job Postings ({publishedJobs.length})
         </h2>
         <div className="mt-5 grid gap-4">
-          {(activeJobs.length ? activeJobs : jobs).length === 0 && (
+          {publishedJobs.length === 0 && (
             <div className="rounded-[18px] border-2 border-dashed border-syncus-blue/35 px-6 py-12 text-center">
-              <p className="text-xl font-black">No employer jobs found.</p>
+              <p className="text-xl font-black">No published jobs yet.</p>
               <p className="mt-2 text-sm font-bold text-syncus-blue/55">
-                Create a job after logging in with an employer account.
+                Publish a draft or post a new job to start receiving applicants.
               </p>
+              <button
+                className="mt-5 inline-flex min-h-11 items-center justify-center rounded-lg bg-syncus-blue px-6 text-sm font-black text-syncus-cream"
+                onClick={() => navigate("/employer/post-job")}
+                type="button"
+              >
+                Post a New Job
+              </button>
             </div>
           )}
-          {(activeJobs.length ? activeJobs : jobs).slice(0, 3).map((job) => {
+          {publishedJobs.slice(0, 3).map((job) => {
             const topMatch = candidateMatches[job.job_id]?.[0];
             return (
               <article

@@ -230,6 +230,18 @@ export function loginAccount(payload: LoginAccountPayload) {
 export type WorkMode = "remote" | "onsite" | "hybrid";
 export type JobStatus = "draft" | "published" | "closed";
 
+function normalizeJobStatus(status: unknown): JobStatus {
+  const value = String(status ?? "draft").toLowerCase();
+  if (value === "published" || value === "closed" || value === "draft") {
+    return value;
+  }
+  return "draft";
+}
+
+export function normalizeBackendJob(job: BackendJob): BackendJob {
+  return { ...job, status: normalizeJobStatus(job.status) };
+}
+
 export interface BackendJob {
   job_id: string;
   employer_id: string;
@@ -361,7 +373,7 @@ export function searchCandidates(params: { skills?: string[]; page?: number; pag
 }
 
 export function getJob(jobId: string) {
-  return request<BackendJob>(`/jobs/${jobId}`);
+  return request<BackendJob>(`/jobs/${jobId}`).then(normalizeBackendJob);
 }
 
 export interface CreateJobPayload {
@@ -429,10 +441,26 @@ export interface CandidateRecommendation {
   };
 }
 
-export function createJob(payload: CreateJobPayload) {
-  return request<BackendJob>("/jobs", {
+export type UpdateJobPayload = CreateJobPayload;
+
+export function createJob(payload: CreateJobPayload, options?: { publish?: boolean }) {
+  const query = options?.publish ? "?publish=true" : "";
+  return request<BackendJob>(`/jobs${query}`, {
     method: "POST",
     body: JSON.stringify(payload),
+  }).then(normalizeBackendJob);
+}
+
+export function updateJob(jobId: string, payload: UpdateJobPayload) {
+  return request<BackendJob>(`/jobs/${jobId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  }).then(normalizeBackendJob);
+}
+
+export function deleteJob(jobId: string) {
+  return request<{ message: string }>(`/jobs/${jobId}`, {
+    method: "DELETE",
   });
 }
 
@@ -451,7 +479,29 @@ export function getEmployerJobs(params: { status_filter?: JobStatus; page?: numb
   if (params.page_size) searchParams.set("page_size", String(params.page_size));
 
   const query = searchParams.toString();
-  return request<JobListResponse>(`/jobs/employer/my-jobs${query ? `?${query}` : ""}`);
+  return request<JobListResponse>(`/jobs/employer/my-jobs${query ? `?${query}` : ""}`).then(
+    (response) => ({
+      ...response,
+      jobs: dedupeEmployerJobs(response.jobs.map(normalizeBackendJob)),
+    })
+  );
+}
+
+function dedupeEmployerJobs(jobs: BackendJob[]) {
+  const byId = new Map<string, BackendJob>();
+  for (const job of jobs) {
+    const existing = byId.get(job.job_id);
+    if (!existing) {
+      byId.set(job.job_id, job);
+      continue;
+    }
+    const rank = (status: JobStatus) =>
+      status === "published" ? 2 : status === "draft" ? 1 : 0;
+    if (rank(job.status) > rank(existing.status)) {
+      byId.set(job.job_id, job);
+    }
+  }
+  return [...byId.values()];
 }
 
 export function getEmployerJobStats() {
