@@ -44,6 +44,10 @@ export function EmployerDashboardPage() {
   const [stats, setStats] = useState<JobStatsResponse | null>(null);
   const [candidateMatches, setCandidateMatches] = useState<Record<string, CandidateRecommendation[]>>({});
   const [interviewCount, setInterviewCount] = useState(0);
+  const [interviewApplications, setInterviewApplications] = useState<
+    { id: string; jobTitle: string; createdAt: string }[]
+  >([]);
+  const [shortlistedCount, setShortlistedCount] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
   const [actionJobId, setActionJobId] = useState<string | null>(null);
 
@@ -62,12 +66,29 @@ export function EmployerDashboardPage() {
     const topJobs = publishedJobs.slice(0, 3);
 
     const pipelines = await Promise.allSettled(topJobs.map((job) => getJobPipeline(job.job_id)));
-    setInterviewCount(
-      pipelines.reduce((count, result) => {
-        if (result.status !== "fulfilled") return count;
-        return count + result.value.applications.filter((application) => application.status === "interview").length;
-      }, 0)
-    );
+    const interviews: { id: string; jobTitle: string; createdAt: string }[] = [];
+    let shortlistedCount = 0;
+
+    pipelines.forEach((result, index) => {
+      if (result.status !== "fulfilled") return;
+      const jobTitle = topJobs[index]?.title ?? "Role";
+      for (const application of result.value.applications) {
+        if (application.status === "interview") {
+          interviews.push({
+            id: application.id,
+            jobTitle,
+            createdAt: application.created_at,
+          });
+        }
+        if (application.status === "shortlisted") {
+          shortlistedCount += 1;
+        }
+      }
+    });
+
+    setInterviewApplications(interviews.slice(0, 5));
+    setInterviewCount(interviews.length);
+    setShortlistedCount(shortlistedCount);
 
     const matches = await Promise.allSettled(topJobs.map((job) => getCandidateRecommendations(job.job_id)));
     setCandidateMatches(
@@ -165,7 +186,7 @@ export function EmployerDashboardPage() {
         <StatCard icon={BriefcaseBusiness} label="Active Postings" value={stats?.published_count ?? publishedJobs.length} />
         <StatCard icon={FilePenLine} label="Draft Jobs" value={stats?.draft_count ?? draftJobs.length} hint="Unpublished postings" />
         <StatCard icon={Users} label="Total Applicants" value={applicants} />
-        <StatCard icon={Star} label="Shortlisted" value={Math.max(0, applicants ? Math.round(applicants * 0.2) : 0)} />
+        <StatCard icon={Star} label="Shortlisted" value={shortlistedCount} hint="From active job pipelines" />
         <StatCard icon={Bot} label="AI Match Score" value={`${averageMatch}%`} hint="Avg. match quality across active roles" />
       </section>
 
@@ -308,19 +329,27 @@ export function EmployerDashboardPage() {
             <p className="rounded-xl border-2 border-dashed border-syncus-blue/25 px-4 py-5 text-sm font-bold text-syncus-blue/55">
               No live interview applications yet.
             </p>
-          ) : [0, 1].slice(0, interviewCount).map((item) => (
-            <article key={item} className="flex min-h-16 items-center gap-4 rounded-xl border-2 border-syncus-blue px-4">
-              <span className="grid h-11 w-11 place-items-center rounded-lg bg-syncus-blue/15 text-xs font-black text-syncus-blue">
-                OCT<br />24
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-black">Samantha Lee</span>
-                <span className="block truncate text-xs text-syncus-blue/60">
-                  Senior Product Designer · {item === 0 ? "10:00 AM" : "2:30 PM"} AEST
-                </span>
-              </span>
-            </article>
-          ))}
+          ) : (
+            interviewApplications.map((item) => {
+              const date = new Date(item.createdAt);
+              const month = date.toLocaleString("en-AU", { month: "short" }).toUpperCase();
+              const day = date.getDate();
+
+              return (
+                <article key={item.id} className="flex min-h-16 items-center gap-4 rounded-xl border-2 border-syncus-blue px-4">
+                  <span className="grid h-11 w-11 place-items-center rounded-lg bg-syncus-blue/15 text-xs font-black text-syncus-blue">
+                    {month}
+                    <br />
+                    {day}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-black">Interview scheduled</span>
+                    <span className="block truncate text-xs text-syncus-blue/60">{item.jobTitle}</span>
+                  </span>
+                </article>
+              );
+            })
+          )}
           <p className="text-xs font-bold text-syncus-blue/50">Live interview applications: {interviewCount}</p>
         </div>
       </section>
