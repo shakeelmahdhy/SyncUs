@@ -163,6 +163,7 @@ export function toFrontendJob(job: BackendJob): Job {
 export function toFrontendSearchJob(job: SearchJobResult): Job {
   const skills = job.required_skills.map(titleCaseSkill);
   const locationMode = job.work_mode ? workModeLabels[job.work_mode] : "Hybrid";
+  const experience = job.experience_level ? experienceLabels[job.experience_level] ?? titleCaseSkill(job.experience_level) : "Any experience";
   const category = inferCategory({
     title: job.title,
     description: "",
@@ -182,7 +183,7 @@ export function toFrontendSearchJob(job: SearchJobResult): Job {
     recommended: false,
     postedDate: job.published_at ? formatPostedDate(job.published_at) : "Recently posted",
     salary: "Salary not listed",
-    experience: "Any experience",
+    experience,
     matchScore: Math.min(98, 70 + Math.max(0, skills.length * 4)),
     applicants: job.applications_count,
     interviews: Math.floor(job.applications_count * 0.12),

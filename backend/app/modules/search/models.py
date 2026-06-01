@@ -11,9 +11,10 @@ class SortOrder(str, Enum):
 
 class JobSearchRequest(BaseModel):
     """Filters for job search (used by candidates)"""
-    keyword: Optional[str] = Field(None, max_length=200, description="Search in title and description")
+    keyword: Optional[str] = Field(None, max_length=200, description="Search across jobs, employers, skills, and preferences")
     location: Optional[str] = Field(None, max_length=200)
     work_mode: Optional[str] = Field(None, description="remote | onsite | hybrid")
+    employment_type: Optional[str] = Field(None, description="full-time | part-time | casual | contract")
     education_level: Optional[str] = None
     experience_level: Optional[str] = None
     skills: Optional[List[str]] = Field(None, description="List of required skills to match")
@@ -53,6 +54,7 @@ class JobSearchResponse(BaseModel):
 
 class CandidateFilterRequest(BaseModel):
     """Filters for candidate search (used by employers)"""
+    keyword: Optional[str] = Field(None, max_length=200, description="Search candidate profile text")
     skill_tags: Optional[List[str]] = Field(None, description="Skills to filter by (e.g. ['react', 'python'])")
     education_level: Optional[str] = None
     major: Optional[str] = Field(None, description="Field of study")

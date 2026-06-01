@@ -32,10 +32,9 @@ export function EmployerTalentPoolPage() {
       setLoading(true);
       setError(null);
 
-      const skills =
-        selectedSkill !== "All" ? [selectedSkill.toLowerCase()] : search.trim() ? search.trim().split(/\s+/) : undefined;
+      const skills = selectedSkill !== "All" ? [selectedSkill.toLowerCase()] : undefined;
 
-      searchCandidates({ skills, page_size: 50 })
+      searchCandidates({ keyword: search.trim() || undefined, skills, page_size: 50 })
         .then((response) => {
           if (!isMounted) return;
           setCandidates(response.results);
@@ -69,21 +68,8 @@ export function EmployerTalentPoolPage() {
   }, [candidates]);
 
   const filteredCandidates = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return candidates;
-
-    return candidates.filter((candidate) => {
-      const haystack = [
-        candidate.full_name,
-        candidate.major ?? "",
-        candidate.location ?? "",
-        ...candidate.skills,
-      ]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(query);
-    });
-  }, [candidates, search]);
+    return candidates;
+  }, [candidates]);
 
   const averageMatch = useMemo(() => {
     if (filteredCandidates.length === 0) return 0;

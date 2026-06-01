@@ -327,6 +327,9 @@ export interface JobSearchParams {
   keyword?: string;
   location?: string;
   work_mode?: WorkMode;
+  employment_type?: string;
+  education_level?: string;
+  experience_level?: string;
   skills?: string[];
   page?: number;
   page_size?: number;
@@ -338,6 +341,9 @@ export function searchJobs(params: JobSearchParams = {}) {
   if (params.keyword) searchParams.set("keyword", params.keyword);
   if (params.location) searchParams.set("location", params.location);
   if (params.work_mode) searchParams.set("work_mode", params.work_mode);
+  if (params.employment_type) searchParams.set("employment_type", params.employment_type);
+  if (params.education_level) searchParams.set("education_level", params.education_level);
+  if (params.experience_level) searchParams.set("experience_level", params.experience_level);
   if (params.skills?.length) searchParams.set("skills", params.skills.join(","));
   if (params.page) searchParams.set("page", String(params.page));
   if (params.page_size) searchParams.set("page_size", String(params.page_size));
@@ -352,6 +358,9 @@ export function searchJobDiscovery(params: JobSearchParams & { sort_by?: "newest
   if (params.keyword) searchParams.set("keyword", params.keyword);
   if (params.location) searchParams.set("location", params.location);
   if (params.work_mode) searchParams.set("work_mode", params.work_mode);
+  if (params.employment_type) searchParams.set("employment_type", params.employment_type);
+  if (params.education_level) searchParams.set("education_level", params.education_level);
+  if (params.experience_level) searchParams.set("experience_level", params.experience_level);
   if (params.skills?.length) searchParams.set("skills", params.skills.join(","));
   if (params.page) searchParams.set("page", String(params.page));
   if (params.page_size) searchParams.set("page_size", String(params.page_size));
@@ -361,10 +370,20 @@ export function searchJobDiscovery(params: JobSearchParams & { sort_by?: "newest
   return request<SearchJobResponse>(`/search/jobs${query ? `?${query}` : ""}`);
 }
 
-export function searchCandidates(params: { skills?: string[]; page?: number; page_size?: number } = {}) {
+export function searchCandidates(params: {
+  keyword?: string;
+  skills?: string[];
+  location?: string;
+  available_for?: string;
+  page?: number;
+  page_size?: number;
+} = {}) {
   const searchParams = new URLSearchParams();
 
+  if (params.keyword) searchParams.set("keyword", params.keyword);
   if (params.skills?.length) searchParams.set("skills", params.skills.join(","));
+  if (params.location) searchParams.set("location", params.location);
+  if (params.available_for) searchParams.set("available_for", params.available_for);
   if (params.page) searchParams.set("page", String(params.page));
   if (params.page_size) searchParams.set("page_size", String(params.page_size));
 
