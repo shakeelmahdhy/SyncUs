@@ -1,157 +1,233 @@
-import { BarChart3, BriefcaseBusiness, CalendarDays, CheckCircle2, TrendingUp, Users } from "lucide-react";
-import { applications, candidates, jobs, teamMembers } from "../../data/mockData";
-import { EmployerShell } from "./EmployerShell";
+import { useEffect, useMemo, useState } from "react";
+import {
+  AlertCircle,
+  CalendarDays,
+  CheckCircle,
+  ChevronRight,
+  Clock,
+  XCircle,
+} from "lucide-react";
+import { useNavigate } from "react-router";
+import { listApplications, searchJobs } from "../lib/api";
+import { type Application, toFrontendApplication, toFrontendJob } from "../lib/jobs";
 
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  detail,
-}: {
-  icon: typeof BarChart3;
-  label: string;
-  value: string | number;
-  detail: string;
-}) {
+const statusConfig: Record<
+  Application["status"],
+  { label: string; color: string; bg: string; icon: typeof CheckCircle }
+> = {
+  Applied: { label: "Applied", color: "#1e4890", bg: "#e5eceb", icon: Clock },
+  Shortlisted: { label: "Shortlisted", color: "#d39000", bg: "#f5eed9", icon: CheckCircle },
+  Interviewing: { label: "Interviewing", color: "#7c3aed", bg: "#eee1f8", icon: CalendarDays },
+  Rejected: { label: "Rejected", color: "#dc2626", bg: "#f8dddd", icon: XCircle },
+  Withdrawn: { label: "Withdrawn", color: "#6b7280", bg: "#e8e8e8", icon: AlertCircle },
+};
+
+const filterTabs = ["All", "Applied", "Shortlisted", "Interviewing", "Rejected"] as const;
+type FilterTab = (typeof filterTabs)[number];
+
+const inProgressStatuses: Application["status"][] = ["Applied", "Shortlisted", "Interviewing"];
+
+export function ApplicationsPage() {
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<FilterTab>("All");
+  const [trackedApplications, setTrackedApplications] = useState<Application[]>([]);
+  const [loadingApplications, setLoadingApplications] = useState(true);
+  const [applicationsError, setApplicationsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    Promise.all([listApplications(), searchJobs({ page_size: 100 })])
+      .then(([applicationResponse, jobResponse]) => {
+        if (!isMounted) return;
+        const jobsById = new Map(jobResponse.jobs.map((job) => [job.job_id, toFrontendJob(job)]));
+        setTrackedApplications(
+          applicationResponse.items.map((application) =>
+            toFrontendApplication(application, jobsById.get(application.job_id))
+          )
+        );
+        setApplicationsError(null);
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        setTrackedApplications([]);
+        setApplicationsError(error instanceof Error ? error.message : "Applications could not be loaded.");
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoadingApplications(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const filtered =
+    activeTab === "All"
+      ? trackedApplications
+      : trackedApplications.filter((application) => application.status === activeTab);
+
+  const counts = Object.fromEntries(
+    filterTabs.map((tab) => [
+      tab,
+      tab === "All"
+        ? trackedApplications.length
+        : trackedApplications.filter((application) => application.status === tab).length,
+    ])
+  ) as Record<FilterTab, number>;
+
+  const averageMatch = useMemo(() => {
+    if (trackedApplications.length === 0) return 0;
+
+    return Math.round(
+      trackedApplications.reduce((total, application) => total + application.matchScore, 0) /
+        trackedApplications.length
+    );
+  }, [trackedApplications]);
+
+  const stats = [
+    { label: "Total Applied", value: trackedApplications.length, color: "#1e4890" },
+    {
+      label: "In Progress",
+      value: trackedApplications.filter((application) => inProgressStatuses.includes(application.status)).length,
+      color: "#00804d",
+    },
+    {
+      label: "Interviews",
+      value: trackedApplications.filter((application) => application.status === "Interviewing").length,
+      color: "#7c3aed",
+    },
+    { label: "Avg. Match Score", value: `${averageMatch}%`, color: "#d39000" },
+  ];
+
   return (
-    <article className="rounded-2xl border-2 border-syncus-blue/20 bg-syncus-cream p-5 shadow-card">
-      <span className="grid h-12 w-12 place-items-center rounded-xl bg-syncus-blue/10 text-syncus-blue">
-        <Icon size={22} />
-      </span>
-      <p className="mt-4 text-sm font-bold text-syncus-blue/55">{label}</p>
-      <p className="mt-1 text-3xl font-black leading-none text-syncus-blue">{value}</p>
-      <p className="mt-2 text-xs font-medium text-syncus-blue/50">{detail}</p>
-    </article>
-  );
-}
-
-const funnel = [
-  { label: "Applied", value: applications.length, color: "bg-syncus-blue" },
-  { label: "Shortlisted", value: applications.filter((application) => application.status === "Shortlisted").length, color: "bg-syncus-green" },
-  { label: "Interviewing", value: applications.filter((application) => application.status === "Interviewing").length, color: "bg-syncus-lime" },
-];
-
-export function EmployerAnalyticsPage() {
-  const averageJobMatch = Math.round(jobs.reduce((total, job) => total + job.matchScore, 0) / jobs.length);
-  const averageCandidateMatch = Math.round(
-    candidates.reduce((total, candidate) => total + candidate.matchScore, 0) / candidates.length
-  );
-  const totalApplicants = jobs.reduce((total, job) => total + job.applicants, 0);
-  const topJobs = [...jobs].sort((left, right) => right.applicants - left.applicants).slice(0, 4);
-  const topCandidates = [...candidates].sort((left, right) => right.matchScore - left.matchScore).slice(0, 4);
-  const maxApplicants = Math.max(...topJobs.map((job) => job.applicants), 1);
-
-  return (
-    <EmployerShell>
-      <section className="text-syncus-blue">
-        <header className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="font-serif text-[clamp(2.35rem,4vw,3.8rem)] leading-none text-syncus-blue">
-              Analytics
-            </h1>
-            <p className="mt-3 max-w-2xl text-base font-medium text-syncus-blue/58">
-              Hiring performance, matching quality, and pipeline health across active roles.
+    <main className="bg-syncus-cream px-5 py-8 text-syncus-blue sm:px-8 lg:py-10">
+      <section className="mx-auto max-w-[1120px]">
+        <header className="mb-7">
+          <h1 className="font-serif text-[clamp(2.35rem,4vw,3.8rem)] font-bold leading-none tracking-normal text-syncus-blue">
+            My Applications
+          </h1>
+          <p className="mt-3 text-base font-medium text-syncus-blue/55 sm:text-lg">
+            {loadingApplications ? "Loading your applications..." : "Track the progress of all your submitted applications"}
+          </p>
+          {applicationsError && (
+            <p className="mt-2 text-sm font-bold text-red-600">
+              {applicationsError}
             </p>
-          </div>
-          <span className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-syncus-lime px-4 text-sm font-black text-syncus-blue">
-            <TrendingUp size={17} />
-            {averageJobMatch}% average role match
-          </span>
+          )}
         </header>
 
-        <section className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard icon={BriefcaseBusiness} label="Active jobs" value={jobs.length} detail="Open roles currently listed" />
-          <StatCard icon={Users} label="Applicants" value={totalApplicants} detail="Across all active postings" />
-          <StatCard icon={CheckCircle2} label="Candidate match" value={`${averageCandidateMatch}%`} detail="Average recommended talent score" />
-          <StatCard icon={CalendarDays} label="Interviews" value={jobs.reduce((total, job) => total + job.interviews, 0)} detail="Scheduled from open pipelines" />
-        </section>
+        <div className="mb-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {stats.map(({ label, value, color }) => (
+            <article
+              key={label}
+              className="min-h-[96px] rounded-2xl border-2 border-syncus-blue/15 bg-syncus-cream px-5 py-5"
+            >
+              <p className="text-sm font-bold text-syncus-blue/55">{label}</p>
+              <p className="mt-2 text-[2.15rem] font-bold leading-none" style={{ color }}>
+                {value}
+              </p>
+            </article>
+          ))}
+        </div>
 
-        <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
-          <section className="rounded-2xl border-2 border-syncus-blue/20 bg-syncus-cream p-5 shadow-card">
-            <div className="mb-5 flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-black text-syncus-blue">Role performance</h2>
-                <p className="mt-1 text-sm font-medium text-syncus-blue/55">Applicant volume and match quality by role.</p>
-              </div>
-              <BarChart3 className="text-syncus-green" size={24} />
-            </div>
+        <div className="mb-7 flex gap-2.5 overflow-x-auto pb-2">
+          {filterTabs.map((tab) => {
+            const isActive = activeTab === tab;
 
-            <div className="grid gap-4">
-              {topJobs.map((job) => (
-                <article className="rounded-xl border border-syncus-blue/15 p-4" key={job.id}>
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h3 className="font-black text-syncus-blue">{job.title}</h3>
-                      <p className="text-sm font-medium text-syncus-blue/55">{job.company} · {job.location}</p>
-                    </div>
-                    <span className="rounded-full bg-syncus-lime px-3 py-1 text-xs font-black text-syncus-blue">
-                      {job.matchScore}% match
-                    </span>
-                  </div>
-                  <div className="mt-4 h-3 overflow-hidden rounded-full bg-syncus-blue/10">
-                    <div
-                      className="h-full rounded-full bg-syncus-green"
-                      style={{ width: `${Math.max(8, (job.applicants / maxApplicants) * 100)}%` }}
-                    />
-                  </div>
-                  <p className="mt-2 text-xs font-bold text-syncus-blue/55">
-                    {job.applicants} applicants · {job.interviews} interviews
-                  </p>
-                </article>
-              ))}
-            </div>
-          </section>
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl border-2 px-4 text-sm font-bold transition hover:-translate-y-0.5 sm:text-base"
+                style={{
+                  backgroundColor: isActive ? "#1e4890" : "#f6f8ed",
+                  borderColor: "#1e4890",
+                  color: isActive ? "#f6f8ed" : "#1e4890",
+                }}
+                type="button"
+              >
+                {tab}
+                {counts[tab] > 0 && (
+                  <span
+                    className="grid h-6 min-w-6 place-items-center rounded-full px-1.5 text-xs font-bold"
+                    style={{
+                      backgroundColor: isActive ? "#dbe64c" : "rgba(30,72,144,0.12)",
+                      color: "#1e4890",
+                    }}
+                  >
+                    {counts[tab]}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
 
-          <aside className="grid gap-6">
-            <section className="rounded-2xl border-2 border-syncus-blue/20 bg-syncus-cream p-5 shadow-card">
-              <h2 className="text-xl font-black text-syncus-blue">Pipeline funnel</h2>
-              <div className="mt-5 grid gap-4">
-                {funnel.map((item) => (
-                  <div key={item.label}>
-                    <div className="mb-2 flex justify-between text-sm font-bold text-syncus-blue">
-                      <span>{item.label}</span>
-                      <span>{item.value}</span>
-                    </div>
-                    <div className="h-3 overflow-hidden rounded-full bg-syncus-blue/10">
-                      <div
-                        className={`h-full rounded-full ${item.color}`}
-                        style={{ width: `${Math.max(10, (item.value / Math.max(applications.length, 1)) * 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="rounded-2xl border-2 border-syncus-blue/20 bg-syncus-cream p-5 shadow-card">
-              <h2 className="text-xl font-black text-syncus-blue">Top candidates</h2>
-              <div className="mt-4 grid gap-3">
-                {topCandidates.map((candidate) => (
-                  <div className="rounded-xl bg-syncus-blue/5 p-4" key={candidate.id}>
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="font-black text-syncus-blue">{candidate.name}</p>
-                        <p className="text-sm font-medium text-syncus-blue/55">{candidate.role}</p>
-                      </div>
-                      <span className="rounded-full bg-syncus-green px-3 py-1 text-xs font-black text-syncus-cream">
-                        {candidate.matchScore}%
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="rounded-2xl border-2 border-syncus-blue/20 bg-syncus-blue p-5 text-syncus-cream shadow-card">
-              <p className="text-sm font-bold text-white/62">Hiring team coverage</p>
-              <p className="mt-2 text-3xl font-black">{teamMembers.length} collaborators</p>
-              <p className="mt-2 text-sm font-medium text-white/68">
-                {teamMembers.filter((member) => member.jobsAssigned.length > 0).length} assigned to active roles.
+        <div className="grid gap-4">
+          {filtered.length === 0 ? (
+            <section className="rounded-2xl border-2 border-dashed border-syncus-blue/15 py-12 text-center">
+              <p className="text-lg font-bold text-syncus-blue/55">
+                {applicationsError ? "Applications are unavailable" : `No ${activeTab.toLowerCase()} applications`}
               </p>
             </section>
-          </aside>
+          ) : (
+            filtered.map((application) => {
+              const { color, bg, icon: StatusIcon } = statusConfig[application.status];
+
+              return (
+                <button
+                  key={application.id}
+                  className="grid min-h-[84px] grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 rounded-2xl border-2 border-syncus-blue/15 bg-syncus-cream px-4 py-4 text-left transition hover:-translate-y-0.5 hover:shadow-card sm:px-5 lg:grid-cols-[auto_minmax(0,1fr)_86px_126px_100px_22px] lg:gap-x-5"
+                  onClick={() => navigate(`/jobs/${application.jobId}`)}
+                  type="button"
+                >
+                  <span
+                    className="grid h-12 w-12 place-items-center rounded-xl"
+                    style={{ backgroundColor: bg, color }}
+                  >
+                    <StatusIcon size={20} />
+                  </span>
+
+                  <span className="min-w-0">
+                    <span className="block truncate text-lg font-bold leading-tight text-syncus-blue sm:text-xl">
+                      {application.title}
+                    </span>
+                    <span className="mt-1 block truncate text-sm font-medium text-syncus-blue/55 sm:text-base">
+                      {application.company} · {application.location}
+                    </span>
+                  </span>
+
+                  <span className="col-start-2 row-start-2 flex items-baseline gap-2 lg:col-auto lg:row-auto lg:block lg:text-center">
+                    <span
+                      className="block text-xl font-bold leading-none lg:text-2xl"
+                      style={{ color: application.matchScore >= 90 ? "#00804d" : "#1e4890" }}
+                    >
+                      {application.matchScore}%
+                    </span>
+                    <span className="block text-sm font-medium text-syncus-blue/55 lg:mt-1">Match</span>
+                  </span>
+
+                  <span
+                    className="col-start-2 row-start-3 w-fit rounded-full px-4 py-1.5 text-sm font-bold lg:col-auto lg:row-auto lg:justify-self-center"
+                    style={{ backgroundColor: bg, color }}
+                  >
+                    {statusConfig[application.status].label}
+                  </span>
+
+                  <span className="col-start-2 row-start-4 text-sm font-medium text-syncus-blue/55 lg:col-auto lg:row-auto lg:justify-self-center">
+                    {application.appliedDate}
+                  </span>
+
+                  <ChevronRight className="hidden text-syncus-blue lg:block" size={21} />
+                </button>
+              );
+            })
+          )}
         </div>
       </section>
-    </EmployerShell>
+    </main>
   );
 }
