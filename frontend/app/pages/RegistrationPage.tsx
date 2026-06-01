@@ -241,8 +241,11 @@ export function RegistrationPage() {
             >
               {submitting ? "Creating account..." : "Create Account"}
             </button>
-            <Link className="text-sm font-bold text-syncus-blue underline decoration-syncus-green underline-offset-4 transition hover:text-syncus-green" to="/">
-              Browse jobs first
+            <Link
+              className="text-sm font-bold text-syncus-blue underline decoration-syncus-green underline-offset-4 transition hover:text-syncus-green"
+              to={accountType === "employer" ? "/login?type=employer" : "/login"}
+            >
+              Already have an account? Sign in
             </Link>
           </div>
         </form>

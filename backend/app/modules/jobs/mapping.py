@@ -51,7 +51,12 @@ def _parse_experience_level(raw: Any) -> ExperienceLevel:
         return ExperienceLevel.ANY
 
 
-def job_create_to_row(job_data: JobCreate, employer_id: UUID) -> dict[str, Any]:
+def job_create_to_row(
+    job_data: JobCreate,
+    employer_id: UUID,
+    *,
+    publish: bool = False,
+) -> dict[str, Any]:
     """Build insert payload for ``public.jobs`` from API create body."""
     work_mode = _enum_value(job_data.work_mode)
     experience = job_data.min_years_experience
@@ -73,7 +78,7 @@ def job_create_to_row(job_data: JobCreate, employer_id: UUID) -> dict[str, Any]:
         "salary_max": job_data.salary_max,
         "contact_email": job_data.contact_email,
         "website": job_data.website,
-        "status": JobStatus.DRAFT.value,
+        "status": JobStatus.PUBLISHED.value if publish else JobStatus.DRAFT.value,
     }
     return row
 

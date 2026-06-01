@@ -59,7 +59,7 @@ export function SiteNav() {
             <Link className="transition hover:text-syncus-lime" to="/profile">
               Profile
             </Link>
-            <Link className="transition hover:text-syncus-lime" to="/employer/login">
+            <Link className="transition hover:text-syncus-lime" to="/login?type=employer">
               For Employers
             </Link>
           </nav>

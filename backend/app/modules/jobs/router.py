@@ -35,7 +35,11 @@ def get_job_service() -> JobService:
 async def create_job(
     job_data: JobCreate,
     current_employer: EmployerUserDep,
-    job_service: JobService = Depends(get_job_service)
+    publish: bool = Query(
+        False,
+        description="When true, create the job as published in one step (no separate draft row).",
+    ),
+    job_service: JobService = Depends(get_job_service),
 ) -> Job:
     """
     Create a new job posting.
@@ -56,7 +60,7 @@ async def create_job(
     - **website**: Company website URL
     """
     employer_id = current_employer.sub
-    return await job_service.create_job(job_data, employer_id)
+    return await job_service.create_job(job_data, employer_id, publish=publish)
 
 
 @router.get(
