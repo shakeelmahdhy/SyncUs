@@ -41,7 +41,13 @@ export function RequireEmployer({ children }: { children: ReactNode }) {
   }
 
   if (!allowed) {
-    return <Navigate replace state={{ from: location.pathname }} to="/employer/login" />;
+    return (
+      <Navigate
+        replace
+        state={{ from: location.pathname }}
+        to={{ pathname: "/login", search: "?type=employer" }}
+      />
+    );
   }
 
   return children;

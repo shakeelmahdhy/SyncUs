@@ -118,7 +118,7 @@ export function EmployerShell({ children }: { children: ReactNode }) {
                 className="min-h-12 rounded-lg border border-white/30 px-4 text-sm font-bold text-syncus-cream transition hover:bg-white/10"
                 onClick={() => {
                   clearAccessToken();
-                  navigate("/employer/login");
+                  navigate({ pathname: "/login", search: "?type=employer" });
                 }}
                 type="button"
               >
