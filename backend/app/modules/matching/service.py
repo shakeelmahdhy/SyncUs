@@ -146,7 +146,11 @@ class MatchingService:
         response = (
             self._client()
             .table("jobs")
-            .select("id, employer_id, title, description, required_skills, location, work_mode, experience_required, status, created_at")
+            .select(
+                "id, employer_id, title, description, required_skills, location, work_mode, "
+                "experience_required, max_years_experience, education_level, experience_level, "
+                "salary_min, salary_max, contact_email, website, status, created_at"
+            )
             .eq("status", "published")
             .execute()
         )
@@ -156,7 +160,11 @@ class MatchingService:
         response = (
             self._client()
             .table("jobs")
-            .select("id, employer_id, title, description, required_skills, location, work_mode, experience_required, status, created_at")
+            .select(
+                "id, employer_id, title, description, required_skills, location, work_mode, "
+                "experience_required, max_years_experience, education_level, experience_level, "
+                "salary_min, salary_max, contact_email, website, status, created_at"
+            )
             .eq("id", str(job_id))
             .limit(1)
             .execute()
