@@ -22,6 +22,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
+                deleteDir()
                 git branch: 'master', credentialsId: 'Git token', url: 'https://github.com/shakeelmahdhy/SyncUs.git'
             }
         }
