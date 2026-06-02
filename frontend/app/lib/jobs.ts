@@ -1,5 +1,5 @@
 import type { ApplicationStatus, BackendJob, SearchJobResult, TrackingApplication, WorkMode } from "./api";
-import { getJob, getJobRecommendations } from "./api";
+import { getJob, getJobRecommendations, searchJobDiscovery } from "./api";
 
 export interface Job {
   id: string;
@@ -232,31 +232,47 @@ export async function fetchRecommendedRoles(): Promise<RecommendedRole[]> {
   const recommendations = await getJobRecommendations();
   if (recommendations.length === 0) return [];
 
-  const jobDetails = await Promise.allSettled(recommendations.map((item) => getJob(item.job_id)));
+  const [jobDetails, searchFallback] = await Promise.all([
+    Promise.allSettled(recommendations.map((item) => getJob(item.job_id))),
+    searchJobDiscovery({ page_size: 100 }).catch(() => null),
+  ]);
+  const fallbackById = new Map((searchFallback?.results ?? []).map((job) => [job.job_id, job]));
 
   return recommendations.map((item, index) => {
     const detail = jobDetails[index]?.status === "fulfilled" ? jobDetails[index].value : null;
+    const fallback = fallbackById.get(item.job_id);
     const skills = item.required_skills.map(titleCaseSkill);
-    const location = item.location ?? detail?.location ?? "Location TBD";
+    const location = item.location ?? detail?.location ?? fallback?.location ?? "Location TBD";
     const workMode = item.work_mode
       ? workModeLabels[item.work_mode as WorkMode] ?? titleCaseSkill(item.work_mode)
       : detail
         ? workModeLabels[detail.work_mode]
-        : "Hybrid";
+        : fallback?.work_mode
+          ? workModeLabels[fallback.work_mode]
+          : "Hybrid";
 
     return {
       jobId: item.job_id,
       title: item.title,
-      company: detail?.company_name ?? "Employer",
+      company: detail?.company_name ?? fallback?.company_name ?? "Employer",
       location,
       workMode,
-      skills,
+      skills: skills.length ? skills : (fallback?.required_skills ?? []).map(titleCaseSkill),
       matchScore: Math.round(item.score * 100),
       description:
         detail?.description ??
+        fallback?.description ??
         (skills.length ? `Required skills: ${skills.join(", ")}` : "Open role from SyncUs matching."),
-      salary: detail ? formatSalary(detail) : "Salary not listed",
-      category: detail ? inferCategory(detail) : "General",
+      salary: detail ? formatSalary(detail) : fallback ? formatSearchSalary(fallback) : "Salary not listed",
+      category: detail
+        ? inferCategory(detail)
+        : fallback
+          ? inferCategory({
+              title: fallback.title,
+              description: fallback.description ?? "",
+              required_skills: fallback.required_skills,
+            } as BackendJob)
+          : "General",
     };
   });
 }

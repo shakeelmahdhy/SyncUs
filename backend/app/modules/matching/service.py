@@ -136,7 +136,27 @@ class MatchingService:
             )
             rows = response.data or []
         if not rows:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job seeker profile not found")
+            employer = client.table("employers").select("id").eq("id", str(user_id)).limit(1).execute()
+            if employer.data:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Employer accounts do not have job recommendations",
+                )
+
+            minimal_profile = {
+                "id": str(user_id),
+                "user_id": str(user_id),
+                "first_name": "",
+                "last_name": "",
+            }
+            try:
+                inserted = client.table("job_seekers").insert(minimal_profile).execute()
+                rows = inserted.data or [minimal_profile]
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Job seeker profile not found",
+                ) from exc
 
         candidate = rows[0]
         candidate["skills"] = self._candidate_skills(candidate["id"], candidate.get("skills"))
