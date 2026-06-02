@@ -55,7 +55,7 @@ pipeline {
             steps {
                 dir('backend') {
                     bat '''
-                        venv\\Scripts\\python -m pytest tests/ -m smoke -v
+                        venv\\Scripts\\python -m pytest tests/smoke -v
                     '''
                 }
             }
@@ -65,7 +65,7 @@ pipeline {
             steps {
                 dir('backend') {
                     bat '''
-                        venv\\Scripts\\python -m pytest tests/ -m unit -v
+                        venv\\Scripts\\python -m pytest tests/unit -v
                     '''
                 }
             }
@@ -75,7 +75,7 @@ pipeline {
             steps {
                 dir('backend') {
                     bat '''
-                        venv\\Scripts\\python -m pytest tests/ -m integration -v
+                        venv\\Scripts\\python -m pytest tests/integration -v
                     '''
                 }
             }
