@@ -22,7 +22,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'integration/dev/matching', credentialsId: 'Git token', url: 'https://github.com/shakeelmahdhy/SyncUs.git'
+                git branch: 'master', credentialsId: 'Git token', url: 'https://github.com/shakeelmahdhy/SyncUs.git'
             }
         }
         stage('Build') {
