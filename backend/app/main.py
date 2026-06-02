@@ -75,7 +75,7 @@ async def global_exception_handler(request, exc):
             "error": str(exc) if os.getenv("DEBUG") == "true" else "An error occurred",
         },
     )
-#fd
+
 
 if __name__ == "__main__":
     import uvicorn
