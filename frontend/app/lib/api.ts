@@ -17,11 +17,64 @@ function resolveApiBaseUrl(): string {
 const API_BASE_URL = resolveApiBaseUrl();
 const AUTH_TOKEN_KEY = "syncus_access_token";
 const ACCOUNT_TYPE_KEY = "syncus_account_type";
+const SESSION_PROFILE_KEY = "syncus_session_profile";
+const AUTH_CHANGED_EVENT = "syncus-auth-changed";
+
+function notifyAuthChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
+}
+
+export function onAuthChanged(listener: () => void) {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(AUTH_CHANGED_EVENT, listener);
+  window.addEventListener("storage", listener);
+  return () => {
+    window.removeEventListener(AUTH_CHANGED_EVENT, listener);
+    window.removeEventListener("storage", listener);
+  };
+}
 
 export type StoredAccountType = "job_seeker" | "employer";
 
+export interface StoredSessionProfile {
+  displayName?: string | null;
+  email?: string | null;
+  accountType?: StoredAccountType | null;
+}
+
+export function storeSessionProfile(profile: StoredSessionProfile) {
+  if (typeof window === "undefined") return;
+  const current = getStoredSessionProfile() ?? {};
+  const next = { ...current, ...profile };
+  const serialized = JSON.stringify(next);
+  if (window.localStorage.getItem(SESSION_PROFILE_KEY) === serialized) return;
+  window.localStorage.setItem(SESSION_PROFILE_KEY, serialized);
+  notifyAuthChanged();
+}
+
+export function getStoredSessionProfile(): StoredSessionProfile | null {
+  if (typeof window === "undefined") return null;
+  const raw = window.localStorage.getItem(SESSION_PROFILE_KEY);
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw) as StoredSessionProfile;
+  } catch {
+    window.localStorage.removeItem(SESSION_PROFILE_KEY);
+    return null;
+  }
+}
+
+export function clearStoredSessionProfile() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(SESSION_PROFILE_KEY);
+  notifyAuthChanged();
+}
+
 export function storeAccountType(accountType: StoredAccountType) {
   window.localStorage.setItem(ACCOUNT_TYPE_KEY, accountType);
+  notifyAuthChanged();
 }
 
 export function getStoredAccountType(): StoredAccountType | null {
@@ -34,6 +87,7 @@ export function getStoredAccountType(): StoredAccountType | null {
 export function clearAccountType() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(ACCOUNT_TYPE_KEY);
+  notifyAuthChanged();
 }
 
 export function getStoredAccessToken() {
@@ -43,16 +97,30 @@ export function getStoredAccessToken() {
 
 export function storeAccessToken(token: string) {
   window.localStorage.setItem(AUTH_TOKEN_KEY, token);
+  notifyAuthChanged();
 }
 
 export function clearAccessToken() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(AUTH_TOKEN_KEY);
-  clearAccountType();
+  window.localStorage.removeItem(ACCOUNT_TYPE_KEY);
+  window.localStorage.removeItem(SESSION_PROFILE_KEY);
+  notifyAuthChanged();
 }
 
 export function hasStoredAccessToken() {
   return Boolean(getStoredAccessToken());
+}
+
+export function isAuthFailureMessage(message: string) {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("not authenticated") ||
+    normalized.includes("invalid or expired token") ||
+    normalized.includes("unauthorized") ||
+    normalized.includes("forbidden") ||
+    normalized.includes("no authenticated user")
+  );
 }
 
 function getJwtSub(token: string | null) {
@@ -280,6 +348,7 @@ export interface SearchJobResult {
   job_id: string;
   title: string;
   company_name: string;
+  description?: string;
   location: string;
   work_mode: WorkMode | "";
   required_skills: string[];

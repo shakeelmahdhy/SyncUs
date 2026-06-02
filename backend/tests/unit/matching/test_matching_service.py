@@ -111,6 +111,23 @@ def test_candidate_profile_resolves_by_user_id_and_merges_skills() -> None:
     assert profile["skills"] == ["Python", "SQL", "FastAPI"]
 
 
+def test_candidate_profile_provisions_missing_job_seeker_profile() -> None:
+    auth_user_id = UUID("11111111-1111-1111-1111-111111111111")
+    tables = {
+        "job_seekers": [],
+        "employers": [],
+        "job_seeker_skills": [],
+    }
+    service = MatchingService(_FakeClient(tables))
+
+    profile = service._candidate_profile(auth_user_id)
+
+    assert profile["id"] == str(auth_user_id)
+    assert profile["user_id"] == str(auth_user_id)
+    assert profile["skills"] == []
+    assert tables["job_seekers"][0]["id"] == str(auth_user_id)
+
+
 def test_match_persistence_updates_existing_pair_without_unique_constraint() -> None:
     job_id = "44444444-4444-4444-4444-444444444444"
     first_candidate_id = "55555555-5555-5555-5555-555555555555"
@@ -158,3 +175,11 @@ def test_skill_score_rewards_required_skill_coverage() -> None:
     assert service.calculate_skill_score(["Python", "React"], ["python"]) == 1.0
     assert service.calculate_skill_score([], ["python"]) == 0.0
     assert service.calculate_skill_score(["Python"], []) == 1.0
+
+
+def test_work_mode_score_accepts_profile_work_mode_alias() -> None:
+    service = MatchingService(_FakeClient({}))
+
+    assert service.calculate_work_mode_score({"work_mode": "Remote"}, {"work_mode": "remote"}) == 1.0
+    assert service.calculate_work_mode_score({"working_preferences": "Hybrid work"}, {"work_mode": "hybrid"}) == 1.0
+    assert service.calculate_work_mode_score({"work_mode": "onsite"}, {"work_mode": "remote"}) == 0.0

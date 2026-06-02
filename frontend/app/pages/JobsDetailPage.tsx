@@ -11,7 +11,15 @@ import {
   Star,
   Zap,
 } from "lucide-react";
-import { createApplication, getJob, hasStoredAccessToken, searchJobDiscovery } from "../lib/api";
+import {
+  createApplication,
+  getJob,
+  getStoredAccountType,
+  hasStoredAccessToken,
+  listApplications,
+  onAuthChanged,
+  searchJobDiscovery,
+} from "../lib/api";
 import { type Job, toFrontendJob, toFrontendSearchJob } from "../lib/jobs";
 import { SyncUsMark } from "../shared/components";
 
@@ -26,6 +34,7 @@ export function JobDetailPage() {
   const [submitted, setSubmitted] = useState(false);
   const [submittingApplication, setSubmittingApplication] = useState(false);
   const [applicationError, setApplicationError] = useState<string | null>(null);
+  const [existingApplicationId, setExistingApplicationId] = useState<string | null>(null);
   const [coverLetter, setCoverLetter] = useState("");
 
   useEffect(() => {
@@ -36,14 +45,27 @@ export function JobDetailPage() {
     setLoadingJob(true);
     setJobError(null);
 
-    Promise.all([
+    Promise.allSettled([
       getJob(id).then(toFrontendJob),
       searchJobDiscovery({ page_size: 100 }).then((response) => response.results.map(toFrontendSearchJob)),
     ])
-      .then(([apiJob, apiJobs]) => {
+      .then(([jobResult, jobsResult]) => {
         if (!isMounted) return;
+        const apiJobs = jobsResult.status === "fulfilled" ? jobsResult.value : [];
+        const apiJob =
+          jobResult.status === "fulfilled"
+            ? jobResult.value
+            : apiJobs.find((candidate) => String(candidate.id) === String(id)) ?? null;
+
         setJob(apiJob);
         setAllJobs(apiJobs);
+
+        if (jobResult.status === "rejected") {
+          const detailMessage = jobResult.reason instanceof Error ? jobResult.reason.message : "Full job details could not be loaded.";
+          setJobError(apiJob ? `Showing available role data. ${detailMessage}` : detailMessage);
+        } else if (jobsResult.status === "rejected") {
+          setJobError(jobsResult.reason instanceof Error ? jobsResult.reason.message : "Similar roles could not be loaded.");
+        }
       })
       .catch((error) => {
         if (!isMounted) return;
@@ -59,6 +81,35 @@ export function JobDetailPage() {
 
     return () => {
       isMounted = false;
+    };
+  }, [id]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadExistingApplication = () => {
+      if (!id || !hasStoredAccessToken() || getStoredAccountType() === "employer") {
+        setExistingApplicationId(null);
+        return;
+      }
+
+      listApplications()
+        .then(({ items }) => {
+          if (!isMounted) return;
+          const existing = items.find((item) => item.job_id === id);
+          setExistingApplicationId(existing?.id ?? null);
+        })
+        .catch(() => {
+          if (isMounted) setExistingApplicationId(null);
+        });
+    };
+
+    loadExistingApplication();
+    const unsubscribe = onAuthChanged(loadExistingApplication);
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
     };
   }, [id]);
 
@@ -83,6 +134,7 @@ export function JobDetailPage() {
       <main className="flex h-96 items-center justify-center px-6">
         <div className="text-center">
           <p className="text-xl font-medium">Job not found</p>
+          {jobError && <p className="mt-2 max-w-md text-sm text-syncus-blue/60">{jobError}</p>}
           <button className="mt-4 text-sm underline" onClick={() => navigate("/")} type="button">
             Browse all jobs
           </button>
@@ -92,6 +144,16 @@ export function JobDetailPage() {
   }
 
   const openApplyModal = () => {
+    if (existingApplicationId) {
+      navigate("/applications");
+      return;
+    }
+
+    if (getStoredAccountType() === "employer") {
+      setApplicationError("Employer accounts cannot apply to jobs. Switch to a job seeker account to apply.");
+      return;
+    }
+
     if (!hasStoredAccessToken()) {
       navigate("/login", { state: { from: `/jobs/${job?.id}` } });
       return;
@@ -100,6 +162,11 @@ export function JobDetailPage() {
   };
 
   const handleSubmit = async () => {
+    if (getStoredAccountType() === "employer") {
+      setApplicationError("Employer accounts cannot apply to jobs. Switch to a job seeker account to apply.");
+      return;
+    }
+
     if (!hasStoredAccessToken()) {
       navigate("/login", { state: { from: `/jobs/${job?.id}` } });
       return;
@@ -109,7 +176,8 @@ export function JobDetailPage() {
     setApplicationError(null);
 
     try {
-      await createApplication({ job_id: String(job.id), resume_id: null });
+      const application = await createApplication({ job_id: String(job.id), resume_id: null });
+      setExistingApplicationId(application.id);
       setSubmitted(true);
       window.setTimeout(() => {
         setShowApplyModal(false);
@@ -138,6 +206,11 @@ export function JobDetailPage() {
         {jobError && (
           <p className="mb-5 rounded-xl border-2 border-syncus-blue/15 bg-syncus-blue/5 px-4 py-3 text-sm font-bold text-syncus-blue">
             {jobError}
+          </p>
+        )}
+        {applicationError && !showApplyModal && (
+          <p className="mb-5 rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+            {applicationError}
           </p>
         )}
 
@@ -203,7 +276,7 @@ export function JobDetailPage() {
                 className="rounded-2xl bg-syncus-blue px-10 py-3 text-base font-bold text-syncus-cream transition hover:bg-syncus-green"
                 type="button"
               >
-                Apply Now
+                {existingApplicationId ? "View Application" : "Apply Now"}
               </button>
             </section>
 
@@ -245,7 +318,7 @@ export function JobDetailPage() {
                 className="w-full rounded-2xl bg-syncus-green py-3 text-sm font-bold text-syncus-cream transition hover:bg-syncus-blue"
                 type="button"
               >
-                Quick Apply
+                {existingApplicationId ? "View Application" : "Quick Apply"}
               </button>
             </section>
 

@@ -22,7 +22,8 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'integration/dev/matching', credentialsId: 'Git token', url: 'https://github.com/shakeelmahdhy/SyncUs.git'
+                deleteDir()
+                git branch: 'master', credentialsId: 'Git token', url: 'https://github.com/shakeelmahdhy/SyncUs.git'
             }
         }
         stage('Build') {
@@ -50,11 +51,31 @@ pipeline {
             }
         }
 
-        stage('Backend Test') {
+        stage('Backend Smoke Tests') {
             steps {
                 dir('backend') {
                     bat '''
-                        venv\\Scripts\\python -m pytest tests/ -v
+                        venv\\Scripts\\python -m pytest tests/smoke -v
+                    '''
+                }
+            }
+        }
+
+        stage('Backend Unit Tests') {
+            steps {
+                dir('backend') {
+                    bat '''
+                        venv\\Scripts\\python -m pytest tests/unit -v
+                    '''
+                }
+            }
+        }
+
+        stage('Backend Integration Tests') {
+            steps {
+                dir('backend') {
+                    bat '''
+                        venv\\Scripts\\python -m pytest tests/integration -v
                     '''
                 }
             }

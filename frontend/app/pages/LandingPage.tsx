@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Briefcase, CheckCircle2, ChevronLeft, ChevronRight, Filter, MapPin, Search, X } from 'lucide-react';
+import { Briefcase, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Filter, MapPin, Search, X } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import { searchJobDiscovery } from '../lib/api';
+import {
+  createApplication,
+  getStoredAccountType,
+  hasStoredAccessToken,
+  listApplications,
+  onAuthChanged,
+  searchJobDiscovery,
+} from '../lib/api';
 import { type Job, toFrontendSearchJob } from '../lib/jobs';
 
 const jobTypes = ['Full-Time', 'Part-Time', 'Casual', 'Contract'];
@@ -21,7 +28,21 @@ function FilterCheckbox({ label, checked, onChange }: { label: string; checked: 
   );
 }
 
-function JobCard({ job, onApply, onView }: { job: Job; onApply: () => void; onView: () => void }) {
+function JobCard({
+  job,
+  applied,
+  applying,
+  onApply,
+  onView,
+  onViewApplication,
+}: {
+  job: Job;
+  applied: boolean;
+  applying: boolean;
+  onApply: () => void;
+  onView: () => void;
+  onViewApplication: () => void;
+}) {
   return (
     <article className="rounded-2xl border-2 border-syncus-green bg-syncus-cream p-4 shadow-card transition duration-200 hover:-translate-y-0.5 hover:shadow-syncus sm:p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -64,8 +85,17 @@ function JobCard({ job, onApply, onView }: { job: Job; onApply: () => void; onVi
             <button className="min-h-9 rounded-lg border-2 border-syncus-blue px-5 text-sm font-bold text-syncus-blue transition hover:bg-syncus-blue hover:text-syncus-cream" type="button" onClick={onView}>
               View role
             </button>
-            <button className="min-h-9 rounded-lg bg-syncus-blue px-6 text-sm font-bold text-syncus-cream transition hover:bg-syncus-green" type="button" onClick={onApply}>
-              Quick Apply
+            <button
+              className={`min-h-9 rounded-lg px-6 text-sm font-bold transition ${
+                applied
+                  ? 'border-2 border-syncus-green bg-syncus-green/10 text-syncus-green hover:bg-syncus-green hover:text-syncus-cream'
+                  : 'bg-syncus-blue text-syncus-cream hover:bg-syncus-green'
+              }`}
+              type="button"
+              onClick={applied ? onViewApplication : onApply}
+              disabled={applying}
+            >
+              {applying ? 'Applying...' : applied ? 'View application' : 'Quick Apply'}
             </button>
           </div>
         </div>
@@ -84,8 +114,12 @@ export function LandingPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [applyingJobId, setApplyingJobId] = useState<string | null>(null);
+  const [applyError, setApplyError] = useState<string | null>(null);
+  const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set());
   const [loadingJobs, setLoadingJobs] = useState(true);
   const [jobsError, setJobsError] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -109,6 +143,34 @@ export function LandingPage() {
 
     return () => {
       isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadAppliedJobs = () => {
+      if (!hasStoredAccessToken() || getStoredAccountType() === 'employer') {
+        setAppliedJobIds(new Set());
+        return;
+      }
+
+      listApplications()
+        .then(({ items }) => {
+          if (!isMounted) return;
+          setAppliedJobIds(new Set(items.map((item) => item.job_id)));
+        })
+        .catch(() => {
+          if (isMounted) setAppliedJobIds(new Set());
+        });
+    };
+
+    loadAppliedJobs();
+    const unsubscribe = onAuthChanged(loadAppliedJobs);
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
     };
   }, []);
 
@@ -146,6 +208,37 @@ export function LandingPage() {
     setCurrentPage(1);
   };
 
+  const handleQuickApply = async (job: Job) => {
+    setSelectedJob(job);
+    setApplyError(null);
+
+    if (appliedJobIds.has(String(job.id))) {
+      navigate('/applications');
+      return;
+    }
+
+    if (getStoredAccountType() === 'employer') {
+      setApplyError('Employer accounts cannot apply to jobs. Switch to a job seeker account to apply.');
+      return;
+    }
+
+    if (!hasStoredAccessToken()) {
+      setShowApplyModal(true);
+      return;
+    }
+
+    setApplyingJobId(String(job.id));
+    try {
+      const application = await createApplication({ job_id: String(job.id), resume_id: null });
+      setAppliedJobIds((current) => new Set(current).add(application.job_id));
+      navigate('/applications');
+    } catch (error) {
+      setApplyError(error instanceof Error ? error.message : 'Application could not be submitted.');
+    } finally {
+      setApplyingJobId(null);
+    }
+  };
+
   return (
     <div className="overflow-hidden">
       <main className="relative">
@@ -179,40 +272,52 @@ export function LandingPage() {
 
         <section id="jobs" className="relative mx-auto grid max-w-[1120px] gap-8 px-5 pb-20 sm:px-8 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start">
           <aside className="rounded-2xl border-2 border-syncus-green bg-syncus-cream p-5 shadow-card lg:sticky lg:top-24">
-            <div className="mb-5 flex items-center gap-2.5 text-syncus-green">
-              <Filter size={18} />
-              <h2 className="text-lg font-bold">Quick Filters</h2>
-            </div>
+            <button
+              aria-expanded={filtersOpen}
+              className="flex w-full items-center justify-between gap-3 text-left text-syncus-green"
+              onClick={() => setFiltersOpen((current) => !current)}
+              type="button"
+            >
+              <span className="flex items-center gap-2.5">
+                <Filter size={18} />
+                <span className="text-lg font-bold">Quick Filters</span>
+              </span>
+              <ChevronDown className={`transition-transform ${filtersOpen ? "rotate-180" : ""}`} size={18} />
+            </button>
 
-            <div className="mb-5">
-              <p className="mb-2 text-sm font-bold text-syncus-green">Location</p>
-              <label className="flex min-h-10 items-center gap-2 rounded-xl border-2 border-syncus-green px-3 text-syncus-green">
-                <MapPin size={15} />
-                <input
-                  className="min-w-0 flex-1 bg-transparent text-xs font-medium outline-none placeholder:text-syncus-green/65"
-                  placeholder="Sydney, NSW, Australia..."
-                  value={location}
-                  onChange={(event) => { setLocation(event.target.value); setCurrentPage(1); }}
-                />
-              </label>
-            </div>
+            {filtersOpen && (
+              <div className="mt-5">
+                <div className="mb-5">
+                  <p className="mb-2 text-sm font-bold text-syncus-green">Location</p>
+                  <label className="flex min-h-10 items-center gap-2 rounded-xl border-2 border-syncus-green px-3 text-syncus-green">
+                    <MapPin size={15} />
+                    <input
+                      className="min-w-0 flex-1 bg-transparent text-xs font-medium outline-none placeholder:text-syncus-green/65"
+                      placeholder="Sydney, NSW, Australia..."
+                      value={location}
+                      onChange={(event) => { setLocation(event.target.value); setCurrentPage(1); }}
+                    />
+                  </label>
+                </div>
 
-            <div className="mb-5">
-              <p className="mb-3 text-sm font-bold text-syncus-green">Job Type</p>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
-                {jobTypes.map((type) => <FilterCheckbox key={type} label={type} checked={selectedTypes.includes(type)} onChange={() => toggleType(type)} />)}
+                <div className="mb-5">
+                  <p className="mb-3 text-sm font-bold text-syncus-green">Job Type</p>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+                    {jobTypes.map((type) => <FilterCheckbox key={type} label={type} checked={selectedTypes.includes(type)} onChange={() => toggleType(type)} />)}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="mb-3 text-sm font-bold text-syncus-green">Work Mode</p>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+                    {locationModes.map((mode) => <FilterCheckbox key={mode} label={mode} checked={selectedModes.includes(mode)} onChange={() => toggleMode(mode)} />)}
+                  </div>
+                </div>
               </div>
-            </div>
-
-            <div>
-              <p className="mb-3 text-sm font-bold text-syncus-green">Work Mode</p>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
-                {locationModes.map((mode) => <FilterCheckbox key={mode} label={mode} checked={selectedModes.includes(mode)} onChange={() => toggleMode(mode)} />)}
-              </div>
-            </div>
+            )}
 
             {(selectedTypes.length > 0 || selectedModes.length > 0 || location || search) && (
-              <button className="mt-6 flex items-center gap-1 text-xs font-bold text-syncus-green underline underline-offset-4" type="button" onClick={clearFilters}>
+              <button className="mt-5 flex items-center gap-1 text-xs font-bold text-syncus-green underline underline-offset-4" type="button" onClick={clearFilters}>
                 <X size={13} /> Clear all filters
               </button>
             )}
@@ -230,11 +335,11 @@ export function LandingPage() {
                 <JobCard
                   key={job.id}
                   job={job}
-                  onApply={() => {
-                    setSelectedJob(job);
-                    setShowApplyModal(true);
-                  }}
+                  applied={appliedJobIds.has(String(job.id))}
+                  applying={applyingJobId === String(job.id)}
+                  onApply={() => void handleQuickApply(job)}
                   onView={() => navigate(`/jobs/${job.id}`)}
+                  onViewApplication={() => navigate('/applications')}
                 />
               )) : (
                 <div className="rounded-2xl border-2 border-dashed border-syncus-green px-6 py-16 text-center text-syncus-green">
@@ -259,6 +364,11 @@ export function LandingPage() {
                 <button className="grid h-10 w-10 place-items-center rounded-xl border-2 border-syncus-green text-syncus-green transition hover:bg-syncus-green hover:text-syncus-cream" type="button" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} aria-label="Next page"><ChevronRight size={18} /></button>
               </div>
             )}
+            {applyError && (
+              <p className="mt-5 rounded-lg bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                {applyError}
+              </p>
+            )}
           </section>
         </section>
       </main>
@@ -280,6 +390,13 @@ export function LandingPage() {
             <button className="mt-5 text-xs font-bold text-syncus-blue/70 underline underline-offset-4" type="button" onClick={() => setShowApplyModal(false)}>
               Continue Browsing
             </button>
+          </section>
+        </div>
+      )}
+      {applyingJobId && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-syncus-blue/35 px-5 backdrop-blur-sm">
+          <section className="rounded-3xl border-2 border-syncus-green bg-syncus-cream px-8 py-6 text-center shadow-syncus">
+            <p className="text-sm font-bold text-syncus-blue">Submitting your application...</p>
           </section>
         </div>
       )}

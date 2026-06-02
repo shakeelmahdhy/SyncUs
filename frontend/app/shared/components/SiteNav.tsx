@@ -1,36 +1,64 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { clearAccessToken, getAccountProfile, hasStoredAccessToken } from "../../lib/api";
+import {
+  clearAccessToken,
+  getAccountProfile,
+  getStoredSessionProfile,
+  hasStoredAccessToken,
+  isAuthFailureMessage,
+  onAuthChanged,
+  storeSessionProfile,
+} from "../../lib/api";
 import { SyncUsMark } from "./SyncUsMark";
 
 export function SiteNav() {
   const navigate = useNavigate();
   const [signedIn, setSignedIn] = useState(hasStoredAccessToken());
-  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(() => getStoredSessionProfile()?.displayName ?? null);
 
   useEffect(() => {
-    if (!hasStoredAccessToken()) {
-      setSignedIn(false);
-      setDisplayName(null);
-      return;
-    }
-
     let isMounted = true;
 
-    getAccountProfile()
-      .then((profile) => {
-        if (!isMounted) return;
-        setSignedIn(true);
-        setDisplayName(`${profile.first_name} ${profile.last_name}`.trim() || profile.email || null);
-      })
-      .catch(() => {
-        if (!isMounted) return;
-        setSignedIn(hasStoredAccessToken());
+    const refreshSession = () => {
+      if (!hasStoredAccessToken()) {
+        setSignedIn(false);
         setDisplayName(null);
-      });
+        return;
+      }
+
+      const storedProfile = getStoredSessionProfile();
+      setSignedIn(true);
+      setDisplayName(storedProfile?.displayName ?? storedProfile?.email ?? null);
+
+      getAccountProfile()
+        .then((profile) => {
+          if (!isMounted) return;
+          const nextDisplayName = `${profile.first_name} ${profile.last_name}`.trim() || profile.email || null;
+          setSignedIn(true);
+          setDisplayName(nextDisplayName);
+          storeSessionProfile({ displayName: nextDisplayName, email: profile.email ?? null });
+        })
+        .catch((error) => {
+          if (!isMounted) return;
+          const message = error instanceof Error ? error.message : "";
+          if (isAuthFailureMessage(message)) {
+            clearAccessToken();
+            setSignedIn(false);
+            setDisplayName(null);
+            return;
+          }
+          setSignedIn(hasStoredAccessToken());
+          const fallbackProfile = getStoredSessionProfile();
+          setDisplayName(fallbackProfile?.displayName ?? fallbackProfile?.email ?? null);
+        });
+    };
+
+    refreshSession();
+    const unsubscribe = onAuthChanged(refreshSession);
 
     return () => {
       isMounted = false;
+      unsubscribe();
     };
   }, []);
 
@@ -45,7 +73,9 @@ export function SiteNav() {
     <header className="sticky top-0 z-40 border-b border-white/10 bg-syncus-blue text-syncus-cream shadow-md">
       <div className="mx-auto flex h-[72px] max-w-[1380px] items-center justify-between px-6 lg:px-10">
         <div className="flex items-center gap-10">
-          <SyncUsMark compact />
+          <Link aria-label="SyncUs home" className="shrink-0 transition hover:opacity-85" to="/">
+            <SyncUsMark compact />
+          </Link>
           <nav className="hidden items-center gap-8 text-sm font-medium md:flex">
             <Link className="transition hover:text-syncus-lime" to="/#jobs">
               Jobs
