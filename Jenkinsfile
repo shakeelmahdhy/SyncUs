@@ -39,9 +39,9 @@ pipeline {
                     steps {
                         dir('backend') {
                             bat '''
-                                py -m venv venv
-                                call venv\\Scripts\\activate
-                                pip install -r requirements.txt
+                                where python || (echo Python is not installed or not on PATH. & exit /b 1)
+                                python -m venv venv
+                                venv\\Scripts\\python -m pip install -r requirements.txt
                             '''
                         }
                     }
@@ -53,8 +53,7 @@ pipeline {
             steps {
                 dir('backend') {
                     bat '''
-                        call venv\\Scripts\\activate
-                        python -m pytest tests/ -v
+                        venv\\Scripts\\python -m pytest tests/ -v
                     '''
                 }
             }
