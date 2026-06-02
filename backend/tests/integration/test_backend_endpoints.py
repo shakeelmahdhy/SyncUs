@@ -192,6 +192,7 @@ class FakeSearchService:
                     "job_id": str(JOB_ID),
                     "title": "Backend Engineer",
                     "company_name": "SyncUs",
+                    "description": "Build and maintain SyncUs backend services with reliable API integrations.",
                     "location": "Sydney, NSW",
                     "work_mode": "hybrid",
                     "required_skills": ["python"],

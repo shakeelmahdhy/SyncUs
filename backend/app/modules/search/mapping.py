@@ -24,6 +24,7 @@ def row_to_search_result(
         job_id=str(row["id"]),
         title=row["title"],
         company_name=company_name,
+        description=row.get("description") or "",
         location=row.get("location") or "",
         work_mode=row.get("work_mode") or "",
         required_skills=row.get("required_skills") or [],

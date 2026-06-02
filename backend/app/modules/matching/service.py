@@ -136,7 +136,27 @@ class MatchingService:
             )
             rows = response.data or []
         if not rows:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job seeker profile not found")
+            employer = client.table("employers").select("id").eq("id", str(user_id)).limit(1).execute()
+            if employer.data:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Employer accounts do not have job recommendations",
+                )
+
+            minimal_profile = {
+                "id": str(user_id),
+                "user_id": str(user_id),
+                "first_name": "",
+                "last_name": "",
+            }
+            try:
+                inserted = client.table("job_seekers").insert(minimal_profile).execute()
+                rows = inserted.data or [minimal_profile]
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Job seeker profile not found",
+                ) from exc
 
         candidate = rows[0]
         candidate["skills"] = self._candidate_skills(candidate["id"], candidate.get("skills"))
@@ -220,6 +240,8 @@ class MatchingService:
                 str(candidate.get("location") or ""),
                 str(candidate.get("preferred_location") or ""),
                 str(candidate.get("preferred_working_mode") or ""),
+                str(candidate.get("work_mode") or ""),
+                str(candidate.get("working_preferences") or ""),
                 str(candidate.get("bio") or ""),
                 str(candidate.get("work_experience") or ""),
             ]
@@ -275,11 +297,15 @@ class MatchingService:
         return self._semantic_similarity(preferred, actual)
 
     def calculate_work_mode_score(self, candidate: dict[str, Any], job: dict[str, Any]) -> float:
-        preferred = self._normalize_text(candidate.get("preferred_working_mode"))
+        preferred = self._normalize_text(
+            candidate.get("preferred_working_mode")
+            or candidate.get("work_mode")
+            or candidate.get("working_preferences")
+        )
         actual = self._normalize_text(job.get("work_mode"))
         if not preferred or not actual:
             return 1.0
-        return 1.0 if preferred == actual else 0.0
+        return 1.0 if preferred == actual or preferred in actual or actual in preferred else 0.0
 
     def calculate_total_score(self, candidate: dict[str, Any], job: dict[str, Any]) -> dict[str, Any]:
         skill_score = self.calculate_skill_score(

@@ -5,10 +5,9 @@ import {
   ClipboardList,
   LayoutDashboard,
   Search,
-  UserPlus,
   Users,
 } from "lucide-react";
-import { NavLink, useNavigate } from "react-router";
+import { Link, NavLink, useNavigate } from "react-router";
 import { clearAccessToken, getStoredAccessToken } from "../../lib/api";
 import { SyncUsMark } from "../../shared/components";
 
@@ -43,7 +42,6 @@ const employerLinks = [
   { label: "Post Job", to: "/employer/post-job", icon: BriefcaseBusiness },
   { label: "Applications", to: "/employer/review-applications", icon: ClipboardList },
   { label: "Talent Pool", to: "/employer/talent-pool", icon: Users },
-  { label: "Hiring Team", to: "/employer/hiring-team", icon: UserPlus },
   { label: "Analytics", to: "/employer/analytics", icon: BarChart3 },
 ];
 
@@ -56,7 +54,9 @@ export function EmployerShell({ children }: { children: ReactNode }) {
       <div className="mx-auto grid min-h-screen max-w-[1380px] lg:grid-cols-[244px_minmax(0,1fr)]">
         <aside className="bg-syncus-blue px-5 py-6 text-syncus-cream lg:min-h-screen">
           <div className="mb-10">
-            <SyncUsMark />
+            <Link aria-label="SyncUs home" className="inline-block transition hover:opacity-85" to="/">
+              <SyncUsMark />
+            </Link>
             <p className="mt-1 text-[0.62rem] font-bold uppercase tracking-[0.16em] text-white/58">
               Recruiter dashboard
             </p>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Briefcase, CheckCircle2, MapPin, Search, SlidersHorizontal, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router";
+import { getAccountProfile, searchJobDiscovery } from "../lib/api";
 import { fetchRecommendedRoles, type RecommendedRole } from "../lib/jobs";
 
 const scoreBands = ["All", "90+", "80+", "70+"] as const;
@@ -19,21 +20,48 @@ export function RecommendationsPage() {
   const [query, setQuery] = useState("");
   const [scoreBand, setScoreBand] = useState<ScoreBand>("All");
   const [savedIds, setSavedIds] = useState<string[]>([]);
+  const [profileIncomplete, setProfileIncomplete] = useState(false);
+  const [publishedJobCount, setPublishedJobCount] = useState<number | null>(null);
 
   useEffect(() => {
     let isMounted = true;
 
-    fetchRecommendedRoles()
-      .then((items) => {
+    Promise.allSettled([
+      fetchRecommendedRoles(),
+      getAccountProfile(),
+      searchJobDiscovery({ page_size: 1 }),
+    ])
+      .then(([recommendationsResult, profileResult, jobsResult]) => {
         if (!isMounted) return;
-        setRoles(items);
-        setSavedIds((current) => current.filter((jobId) => items.some((item) => item.jobId === jobId)));
-        setError(null);
-      })
-      .catch((err) => {
-        if (!isMounted) return;
-        setRoles([]);
-        setError(err instanceof Error ? err.message : "Could not load recommendations.");
+
+        if (recommendationsResult.status === "fulfilled") {
+          const items = recommendationsResult.value;
+          setRoles(items);
+          setSavedIds((current) => current.filter((jobId) => items.some((item) => item.jobId === jobId)));
+          setError(null);
+        } else {
+          setRoles([]);
+          setError(
+            recommendationsResult.reason instanceof Error
+              ? recommendationsResult.reason.message
+              : "Could not load recommendations."
+          );
+        }
+
+        if (profileResult.status === "fulfilled") {
+          const profile = profileResult.value;
+          setProfileIncomplete(
+            profile.skills.length === 0 &&
+              !profile.experience &&
+              !profile.title &&
+              !profile.education &&
+              !profile.phone
+          );
+        }
+
+        if (jobsResult.status === "fulfilled") {
+          setPublishedJobCount(jobsResult.value.total);
+        }
       })
       .finally(() => {
         if (isMounted) setLoading(false);
@@ -48,7 +76,6 @@ export function RecommendationsPage() {
     const normalisedQuery = query.trim().toLowerCase();
 
     return roles
-      .filter((job) => job.matchScore >= 70)
       .filter((job) => {
         const matchesQuery =
           !normalisedQuery ||
@@ -63,6 +90,23 @@ export function RecommendationsPage() {
   }, [query, roles, scoreBand]);
 
   const topScore = recommendedJobs[0]?.matchScore ?? 0;
+  const hasActiveFilters = query.trim().length > 0 || scoreBand !== "All";
+  const emptyTitle =
+    roles.length > 0 && hasActiveFilters
+      ? "No recommendations match those filters"
+      : publishedJobCount === 0
+        ? "No published jobs are available yet"
+        : profileIncomplete
+          ? "Complete your profile to improve recommendations"
+          : "No recommendations are available yet";
+  const emptyBody =
+    roles.length > 0 && hasActiveFilters
+      ? "Clear your search or match filter to see all recommended roles."
+      : publishedJobCount === 0
+        ? "Recommendations appear after employers publish matching roles."
+        : profileIncomplete
+          ? "Add skills, experience, education, location, and work preferences so SyncUs can rank jobs against your profile."
+          : "There may be no matching published jobs for your current profile yet.";
 
   return (
     <main className="mx-auto max-w-[1180px] px-5 py-10 text-syncus-blue sm:px-8">
@@ -206,12 +250,12 @@ export function RecommendationsPage() {
             );
           })}
 
-        {!loading && recommendedJobs.length === 0 && (
+        {!loading && !error && recommendedJobs.length === 0 && (
           <section className="rounded-2xl border-2 border-dashed border-syncus-green p-12 text-center text-syncus-blue">
             <CheckCircle2 className="mx-auto mb-3 text-syncus-green" size={34} />
-            <p className="text-xl font-bold">No recommendations match those filters</p>
+            <p className="text-xl font-bold">{emptyTitle}</p>
             <p className="mt-2 text-sm font-medium text-syncus-blue/55">
-              Complete your profile or clear filters to see more matched roles.
+              {emptyBody}
             </p>
           </section>
         )}

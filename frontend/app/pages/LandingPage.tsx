@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Briefcase, CheckCircle2, ChevronLeft, ChevronRight, Filter, MapPin, Search, X } from 'lucide-react';
+import { Briefcase, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Filter, MapPin, Search, X } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import {
   createApplication,
@@ -119,6 +119,7 @@ export function LandingPage() {
   const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set());
   const [loadingJobs, setLoadingJobs] = useState(true);
   const [jobsError, setJobsError] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -271,40 +272,52 @@ export function LandingPage() {
 
         <section id="jobs" className="relative mx-auto grid max-w-[1120px] gap-8 px-5 pb-20 sm:px-8 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start">
           <aside className="rounded-2xl border-2 border-syncus-green bg-syncus-cream p-5 shadow-card lg:sticky lg:top-24">
-            <div className="mb-5 flex items-center gap-2.5 text-syncus-green">
-              <Filter size={18} />
-              <h2 className="text-lg font-bold">Quick Filters</h2>
-            </div>
+            <button
+              aria-expanded={filtersOpen}
+              className="flex w-full items-center justify-between gap-3 text-left text-syncus-green"
+              onClick={() => setFiltersOpen((current) => !current)}
+              type="button"
+            >
+              <span className="flex items-center gap-2.5">
+                <Filter size={18} />
+                <span className="text-lg font-bold">Quick Filters</span>
+              </span>
+              <ChevronDown className={`transition-transform ${filtersOpen ? "rotate-180" : ""}`} size={18} />
+            </button>
 
-            <div className="mb-5">
-              <p className="mb-2 text-sm font-bold text-syncus-green">Location</p>
-              <label className="flex min-h-10 items-center gap-2 rounded-xl border-2 border-syncus-green px-3 text-syncus-green">
-                <MapPin size={15} />
-                <input
-                  className="min-w-0 flex-1 bg-transparent text-xs font-medium outline-none placeholder:text-syncus-green/65"
-                  placeholder="Sydney, NSW, Australia..."
-                  value={location}
-                  onChange={(event) => { setLocation(event.target.value); setCurrentPage(1); }}
-                />
-              </label>
-            </div>
+            {filtersOpen && (
+              <div className="mt-5">
+                <div className="mb-5">
+                  <p className="mb-2 text-sm font-bold text-syncus-green">Location</p>
+                  <label className="flex min-h-10 items-center gap-2 rounded-xl border-2 border-syncus-green px-3 text-syncus-green">
+                    <MapPin size={15} />
+                    <input
+                      className="min-w-0 flex-1 bg-transparent text-xs font-medium outline-none placeholder:text-syncus-green/65"
+                      placeholder="Sydney, NSW, Australia..."
+                      value={location}
+                      onChange={(event) => { setLocation(event.target.value); setCurrentPage(1); }}
+                    />
+                  </label>
+                </div>
 
-            <div className="mb-5">
-              <p className="mb-3 text-sm font-bold text-syncus-green">Job Type</p>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
-                {jobTypes.map((type) => <FilterCheckbox key={type} label={type} checked={selectedTypes.includes(type)} onChange={() => toggleType(type)} />)}
+                <div className="mb-5">
+                  <p className="mb-3 text-sm font-bold text-syncus-green">Job Type</p>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+                    {jobTypes.map((type) => <FilterCheckbox key={type} label={type} checked={selectedTypes.includes(type)} onChange={() => toggleType(type)} />)}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="mb-3 text-sm font-bold text-syncus-green">Work Mode</p>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+                    {locationModes.map((mode) => <FilterCheckbox key={mode} label={mode} checked={selectedModes.includes(mode)} onChange={() => toggleMode(mode)} />)}
+                  </div>
+                </div>
               </div>
-            </div>
-
-            <div>
-              <p className="mb-3 text-sm font-bold text-syncus-green">Work Mode</p>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
-                {locationModes.map((mode) => <FilterCheckbox key={mode} label={mode} checked={selectedModes.includes(mode)} onChange={() => toggleMode(mode)} />)}
-              </div>
-            </div>
+            )}
 
             {(selectedTypes.length > 0 || selectedModes.length > 0 || location || search) && (
-              <button className="mt-6 flex items-center gap-1 text-xs font-bold text-syncus-green underline underline-offset-4" type="button" onClick={clearFilters}>
+              <button className="mt-5 flex items-center gap-1 text-xs font-bold text-syncus-green underline underline-offset-4" type="button" onClick={clearFilters}>
                 <X size={13} /> Clear all filters
               </button>
             )}

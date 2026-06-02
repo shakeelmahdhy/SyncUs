@@ -1,5 +1,5 @@
 import type { ApplicationStatus, BackendJob, SearchJobResult, TrackingApplication, WorkMode } from "./api";
-import { getJob, getJobRecommendations } from "./api";
+import { getJob, getJobRecommendations, searchJobDiscovery } from "./api";
 
 export interface Job {
   id: string;
@@ -72,6 +72,22 @@ function titleCaseSkill(skill: string) {
 }
 
 function formatSalary(job: BackendJob) {
+  if (job.salary_min && job.salary_max) {
+    return `$${job.salary_min.toLocaleString()} - $${job.salary_max.toLocaleString()}`;
+  }
+
+  if (job.salary_min) {
+    return `From $${job.salary_min.toLocaleString()}`;
+  }
+
+  if (job.salary_max) {
+    return `Up to $${job.salary_max.toLocaleString()}`;
+  }
+
+  return "Salary not listed";
+}
+
+function formatSearchSalary(job: SearchJobResult) {
   if (job.salary_min && job.salary_max) {
     return `$${job.salary_min.toLocaleString()} - $${job.salary_max.toLocaleString()}`;
   }
@@ -163,11 +179,21 @@ export function toFrontendJob(job: BackendJob): Job {
 export function toFrontendSearchJob(job: SearchJobResult): Job {
   const skills = job.required_skills.map(titleCaseSkill);
   const locationMode = job.work_mode ? workModeLabels[job.work_mode] : "Hybrid";
+  const description = job.description?.trim() ?? "";
   const category = inferCategory({
     title: job.title,
-    description: "",
+    description,
     required_skills: job.required_skills,
   } as BackendJob);
+  const requirements = skills.map((skill) => `Experience with ${skill}`);
+
+  if (job.experience_level && job.experience_level !== "any") {
+    requirements.unshift(`${experienceLabels[job.experience_level] ?? titleCaseSkill(job.experience_level)} experience preferred`);
+  }
+
+  if (job.education_level && job.education_level !== "any") {
+    requirements.push(`${titleCaseSkill(job.education_level)} qualification or equivalent experience`);
+  }
 
   return {
     id: job.job_id,
@@ -176,13 +202,13 @@ export function toFrontendSearchJob(job: SearchJobResult): Job {
     location: job.location,
     types: [locationMode, "Full-Time"],
     respondsWithin: "<3 days",
-    description: skills.length ? `Required skills: ${skills.join(", ")}` : "Open role from SyncUs jobs search.",
-    fullDescription: "Open role from SyncUs jobs search. View the role for the full job description.",
-    requirements: skills.map((skill) => `Experience with ${skill}`),
+    description: description.length > 150 ? `${description.slice(0, 147).trim()}...` : description || (skills.length ? `Required skills: ${skills.join(", ")}` : "Open role from SyncUs jobs search."),
+    fullDescription: description || "Open role from SyncUs jobs search. View the role for the full job description.",
+    requirements: requirements.length > 0 ? requirements : ["Relevant experience for the role"],
     recommended: false,
     postedDate: job.published_at ? formatPostedDate(job.published_at) : "Recently posted",
-    salary: "Salary not listed",
-    experience: "Any experience",
+    salary: formatSearchSalary(job),
+    experience: job.experience_level ? experienceLabels[job.experience_level] ?? titleCaseSkill(job.experience_level) : "Any experience",
     matchScore: Math.min(98, 70 + Math.max(0, skills.length * 4)),
     applicants: job.applications_count,
     interviews: Math.floor(job.applications_count * 0.12),
@@ -206,31 +232,47 @@ export async function fetchRecommendedRoles(): Promise<RecommendedRole[]> {
   const recommendations = await getJobRecommendations();
   if (recommendations.length === 0) return [];
 
-  const jobDetails = await Promise.allSettled(recommendations.map((item) => getJob(item.job_id)));
+  const [jobDetails, searchFallback] = await Promise.all([
+    Promise.allSettled(recommendations.map((item) => getJob(item.job_id))),
+    searchJobDiscovery({ page_size: 100 }).catch(() => null),
+  ]);
+  const fallbackById = new Map((searchFallback?.results ?? []).map((job) => [job.job_id, job]));
 
   return recommendations.map((item, index) => {
     const detail = jobDetails[index]?.status === "fulfilled" ? jobDetails[index].value : null;
+    const fallback = fallbackById.get(item.job_id);
     const skills = item.required_skills.map(titleCaseSkill);
-    const location = item.location ?? detail?.location ?? "Location TBD";
+    const location = item.location ?? detail?.location ?? fallback?.location ?? "Location TBD";
     const workMode = item.work_mode
       ? workModeLabels[item.work_mode as WorkMode] ?? titleCaseSkill(item.work_mode)
       : detail
         ? workModeLabels[detail.work_mode]
-        : "Hybrid";
+        : fallback?.work_mode
+          ? workModeLabels[fallback.work_mode]
+          : "Hybrid";
 
     return {
       jobId: item.job_id,
       title: item.title,
-      company: detail?.company_name ?? "Employer",
+      company: detail?.company_name ?? fallback?.company_name ?? "Employer",
       location,
       workMode,
-      skills,
+      skills: skills.length ? skills : (fallback?.required_skills ?? []).map(titleCaseSkill),
       matchScore: Math.round(item.score * 100),
       description:
         detail?.description ??
+        fallback?.description ??
         (skills.length ? `Required skills: ${skills.join(", ")}` : "Open role from SyncUs matching."),
-      salary: detail ? formatSalary(detail) : "Salary not listed",
-      category: detail ? inferCategory(detail) : "General",
+      salary: detail ? formatSalary(detail) : fallback ? formatSearchSalary(fallback) : "Salary not listed",
+      category: detail
+        ? inferCategory(detail)
+        : fallback
+          ? inferCategory({
+              title: fallback.title,
+              description: fallback.description ?? "",
+              required_skills: fallback.required_skills,
+            } as BackendJob)
+          : "General",
     };
   });
 }

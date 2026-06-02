@@ -29,6 +29,7 @@ class JobSearchResult(BaseModel):
     job_id: str
     title: str
     company_name: str
+    description: str
     location: str
     work_mode: str
     required_skills: List[str]

@@ -45,14 +45,27 @@ export function JobDetailPage() {
     setLoadingJob(true);
     setJobError(null);
 
-    Promise.all([
+    Promise.allSettled([
       getJob(id).then(toFrontendJob),
       searchJobDiscovery({ page_size: 100 }).then((response) => response.results.map(toFrontendSearchJob)),
     ])
-      .then(([apiJob, apiJobs]) => {
+      .then(([jobResult, jobsResult]) => {
         if (!isMounted) return;
+        const apiJobs = jobsResult.status === "fulfilled" ? jobsResult.value : [];
+        const apiJob =
+          jobResult.status === "fulfilled"
+            ? jobResult.value
+            : apiJobs.find((candidate) => String(candidate.id) === String(id)) ?? null;
+
         setJob(apiJob);
         setAllJobs(apiJobs);
+
+        if (jobResult.status === "rejected") {
+          const detailMessage = jobResult.reason instanceof Error ? jobResult.reason.message : "Full job details could not be loaded.";
+          setJobError(apiJob ? `Showing available role data. ${detailMessage}` : detailMessage);
+        } else if (jobsResult.status === "rejected") {
+          setJobError(jobsResult.reason instanceof Error ? jobsResult.reason.message : "Similar roles could not be loaded.");
+        }
       })
       .catch((error) => {
         if (!isMounted) return;
@@ -121,6 +134,7 @@ export function JobDetailPage() {
       <main className="flex h-96 items-center justify-center px-6">
         <div className="text-center">
           <p className="text-xl font-medium">Job not found</p>
+          {jobError && <p className="mt-2 max-w-md text-sm text-syncus-blue/60">{jobError}</p>}
           <button className="mt-4 text-sm underline" onClick={() => navigate("/")} type="button">
             Browse all jobs
           </button>
