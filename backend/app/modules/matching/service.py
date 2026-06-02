@@ -220,6 +220,8 @@ class MatchingService:
                 str(candidate.get("location") or ""),
                 str(candidate.get("preferred_location") or ""),
                 str(candidate.get("preferred_working_mode") or ""),
+                str(candidate.get("work_mode") or ""),
+                str(candidate.get("working_preferences") or ""),
                 str(candidate.get("bio") or ""),
                 str(candidate.get("work_experience") or ""),
             ]
@@ -275,11 +277,15 @@ class MatchingService:
         return self._semantic_similarity(preferred, actual)
 
     def calculate_work_mode_score(self, candidate: dict[str, Any], job: dict[str, Any]) -> float:
-        preferred = self._normalize_text(candidate.get("preferred_working_mode"))
+        preferred = self._normalize_text(
+            candidate.get("preferred_working_mode")
+            or candidate.get("work_mode")
+            or candidate.get("working_preferences")
+        )
         actual = self._normalize_text(job.get("work_mode"))
         if not preferred or not actual:
             return 1.0
-        return 1.0 if preferred == actual else 0.0
+        return 1.0 if preferred == actual or preferred in actual or actual in preferred else 0.0
 
     def calculate_total_score(self, candidate: dict[str, Any], job: dict[str, Any]) -> dict[str, Any]:
         skill_score = self.calculate_skill_score(

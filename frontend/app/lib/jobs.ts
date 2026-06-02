@@ -87,6 +87,22 @@ function formatSalary(job: BackendJob) {
   return "Salary not listed";
 }
 
+function formatSearchSalary(job: SearchJobResult) {
+  if (job.salary_min && job.salary_max) {
+    return `$${job.salary_min.toLocaleString()} - $${job.salary_max.toLocaleString()}`;
+  }
+
+  if (job.salary_min) {
+    return `From $${job.salary_min.toLocaleString()}`;
+  }
+
+  if (job.salary_max) {
+    return `Up to $${job.salary_max.toLocaleString()}`;
+  }
+
+  return "Salary not listed";
+}
+
 function formatPostedDate(value: string) {
   const created = new Date(value);
   const diffMs = Date.now() - created.getTime();
@@ -163,11 +179,21 @@ export function toFrontendJob(job: BackendJob): Job {
 export function toFrontendSearchJob(job: SearchJobResult): Job {
   const skills = job.required_skills.map(titleCaseSkill);
   const locationMode = job.work_mode ? workModeLabels[job.work_mode] : "Hybrid";
+  const description = job.description?.trim() ?? "";
   const category = inferCategory({
     title: job.title,
-    description: "",
+    description,
     required_skills: job.required_skills,
   } as BackendJob);
+  const requirements = skills.map((skill) => `Experience with ${skill}`);
+
+  if (job.experience_level && job.experience_level !== "any") {
+    requirements.unshift(`${experienceLabels[job.experience_level] ?? titleCaseSkill(job.experience_level)} experience preferred`);
+  }
+
+  if (job.education_level && job.education_level !== "any") {
+    requirements.push(`${titleCaseSkill(job.education_level)} qualification or equivalent experience`);
+  }
 
   return {
     id: job.job_id,
@@ -176,13 +202,13 @@ export function toFrontendSearchJob(job: SearchJobResult): Job {
     location: job.location,
     types: [locationMode, "Full-Time"],
     respondsWithin: "<3 days",
-    description: skills.length ? `Required skills: ${skills.join(", ")}` : "Open role from SyncUs jobs search.",
-    fullDescription: "Open role from SyncUs jobs search. View the role for the full job description.",
-    requirements: skills.map((skill) => `Experience with ${skill}`),
+    description: description.length > 150 ? `${description.slice(0, 147).trim()}...` : description || (skills.length ? `Required skills: ${skills.join(", ")}` : "Open role from SyncUs jobs search."),
+    fullDescription: description || "Open role from SyncUs jobs search. View the role for the full job description.",
+    requirements: requirements.length > 0 ? requirements : ["Relevant experience for the role"],
     recommended: false,
     postedDate: job.published_at ? formatPostedDate(job.published_at) : "Recently posted",
-    salary: "Salary not listed",
-    experience: "Any experience",
+    salary: formatSearchSalary(job),
+    experience: job.experience_level ? experienceLabels[job.experience_level] ?? titleCaseSkill(job.experience_level) : "Any experience",
     matchScore: Math.min(98, 70 + Math.max(0, skills.length * 4)),
     applicants: job.applications_count,
     interviews: Math.floor(job.applications_count * 0.12),

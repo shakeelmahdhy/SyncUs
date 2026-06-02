@@ -5,6 +5,7 @@ import {
   registerAccount,
   storeAccessToken,
   storeAccountType,
+  storeSessionProfile,
   type AccountType,
   type RegisterAccountPayload,
 } from "../lib/api";
@@ -85,6 +86,11 @@ export function RegistrationPage() {
       if (response.access_token) {
         storeAccessToken(response.access_token);
         storeAccountType(accountType);
+        storeSessionProfile({
+          displayName: `${payload.first_name} ${payload.last_name}`.trim() || payload.email,
+          email: payload.email,
+          accountType,
+        });
         navigate(accountType === "job_seeker" ? "/profile" : "/employer/dashboard");
         return;
       }

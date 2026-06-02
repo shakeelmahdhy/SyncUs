@@ -158,3 +158,11 @@ def test_skill_score_rewards_required_skill_coverage() -> None:
     assert service.calculate_skill_score(["Python", "React"], ["python"]) == 1.0
     assert service.calculate_skill_score([], ["python"]) == 0.0
     assert service.calculate_skill_score(["Python"], []) == 1.0
+
+
+def test_work_mode_score_accepts_profile_work_mode_alias() -> None:
+    service = MatchingService(_FakeClient({}))
+
+    assert service.calculate_work_mode_score({"work_mode": "Remote"}, {"work_mode": "remote"}) == 1.0
+    assert service.calculate_work_mode_score({"working_preferences": "Hybrid work"}, {"work_mode": "hybrid"}) == 1.0
+    assert service.calculate_work_mode_score({"work_mode": "onsite"}, {"work_mode": "remote"}) == 0.0

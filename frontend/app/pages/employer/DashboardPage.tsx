@@ -27,12 +27,12 @@ import { EmployerShell } from "./EmployerShell";
 
 function StatCard({ icon: Icon, label, value, hint }: { icon: typeof BriefcaseBusiness; label: string; value: string | number; hint?: string }) {
   return (
-    <article className="min-h-[150px] rounded-[18px] border-2 border-syncus-blue/55 bg-syncus-cream p-6">
-      <span className="grid h-14 w-14 place-items-center rounded-xl bg-syncus-blue/20 text-syncus-blue">
-        <Icon size={25} />
+    <article className="min-h-[124px] rounded-2xl border-2 border-syncus-blue/45 bg-syncus-cream p-4 sm:p-5">
+      <span className="grid h-11 w-11 place-items-center rounded-xl bg-syncus-blue/20 text-syncus-blue">
+        <Icon size={21} />
       </span>
-      <p className="mt-4 text-sm font-medium text-syncus-blue">{label}</p>
-      <p className="mt-1 text-3xl font-black leading-none text-syncus-blue">{value}</p>
+      <p className="mt-3 text-xs font-black uppercase tracking-[0.06em] text-syncus-blue/65">{label}</p>
+      <p className="mt-1 text-2xl font-black leading-none text-syncus-blue sm:text-[1.7rem]">{value}</p>
       {hint && <p className="mt-1 text-xs italic text-syncus-blue/48">{hint}</p>}
     </article>
   );
@@ -160,12 +160,12 @@ export function EmployerDashboardPage() {
 
   return (
     <EmployerShell>
-      <header className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+      <header className="mb-7 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="font-serif text-[clamp(2.7rem,5vw,5.2rem)] leading-none tracking-normal text-syncus-blue">
+          <h1 className="font-serif text-[clamp(2.35rem,4.2vw,4rem)] leading-none tracking-normal text-syncus-blue">
             Dashboard Overview
           </h1>
-          <p className="mt-4 text-base font-medium text-syncus-blue">
+          <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-syncus-blue/70 sm:text-base">
             Welcome back. Here is what is happening with your hiring pipeline today.
           </p>
           {notice && <p className="mt-2 text-sm font-bold text-red-600">{notice}</p>}
@@ -182,7 +182,7 @@ export function EmployerDashboardPage() {
         </div>
       </header>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <StatCard icon={BriefcaseBusiness} label="Active Postings" value={stats?.published_count ?? publishedJobs.length} />
         <StatCard icon={FilePenLine} label="Draft Jobs" value={stats?.draft_count ?? draftJobs.length} hint="Unpublished postings" />
         <StatCard icon={Users} label="Total Applicants" value={applicants} />
@@ -191,27 +191,27 @@ export function EmployerDashboardPage() {
       </section>
 
       {draftJobs.length > 0 && (
-        <section className="mt-9">
-          <h2 className="font-serif text-[clamp(2rem,3vw,2.8rem)] leading-none text-syncus-blue">
+        <section className="mt-8">
+          <h2 className="font-serif text-[clamp(1.7rem,2.6vw,2.35rem)] leading-none text-syncus-blue">
             Draft Jobs ({draftJobs.length})
           </h2>
           <p className="mt-2 text-sm font-medium text-syncus-blue/60">
             Drafts are only visible to you until you publish them.
           </p>
-          <div className="mt-5 grid gap-4">
+          <div className="mt-4 grid gap-3">
             {draftJobs.map((job) => {
               const busy = actionJobId === job.job_id;
               return (
                 <article
                   key={job.job_id}
-                  className="grid gap-4 rounded-[18px] border-2 border-dashed border-syncus-blue/45 bg-syncus-cream/80 px-5 py-4 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center"
+                  className="grid gap-4 rounded-2xl border-2 border-dashed border-syncus-blue/40 bg-syncus-cream/80 px-4 py-4 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center"
                 >
-                  <span className="grid h-12 w-12 place-items-center rounded-xl bg-syncus-blue/15 text-syncus-blue">
-                    <FilePenLine size={21} />
+                  <span className="grid h-10 w-10 place-items-center rounded-xl bg-syncus-blue/15 text-syncus-blue">
+                    <FilePenLine size={18} />
                   </span>
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="truncate text-2xl font-medium leading-tight text-syncus-blue">{job.title}</h3>
+                      <h3 className="truncate text-xl font-medium leading-tight text-syncus-blue">{job.title}</h3>
                       <span className="rounded-full border-2 border-syncus-blue/30 bg-white px-2.5 py-0.5 text-[0.65rem] font-black uppercase tracking-[0.12em] text-syncus-blue/70">
                         Draft
                       </span>
@@ -225,7 +225,7 @@ export function EmployerDashboardPage() {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button
-                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border-2 border-syncus-blue px-4 text-sm font-black text-syncus-blue transition hover:bg-syncus-blue/5 disabled:opacity-60"
+                      className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border-2 border-syncus-blue px-3 text-xs font-black text-syncus-blue transition hover:bg-syncus-blue/5 disabled:opacity-60 sm:text-sm"
                       disabled={busy}
                       onClick={() => navigate(`/employer/post-job?edit=${job.job_id}`)}
                       type="button"
@@ -234,7 +234,7 @@ export function EmployerDashboardPage() {
                       Edit
                     </button>
                     <button
-                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-syncus-green px-4 text-sm font-black text-syncus-cream transition hover:-translate-y-0.5 disabled:opacity-60"
+                      className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-syncus-green px-3 text-xs font-black text-syncus-cream transition hover:-translate-y-0.5 disabled:opacity-60 sm:text-sm"
                       disabled={busy}
                       onClick={() => void handlePublishDraft(job.job_id)}
                       type="button"
@@ -243,7 +243,7 @@ export function EmployerDashboardPage() {
                       {busy ? "Publishing..." : "Publish"}
                     </button>
                     <button
-                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border-2 border-red-300 px-4 text-sm font-black text-red-700 transition hover:bg-red-50 disabled:opacity-60"
+                      className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border-2 border-red-300 px-3 text-xs font-black text-red-700 transition hover:bg-red-50 disabled:opacity-60 sm:text-sm"
                       disabled={busy}
                       onClick={() => void handleDeleteDraft(job)}
                       type="button"
@@ -259,14 +259,14 @@ export function EmployerDashboardPage() {
         </section>
       )}
 
-      <section className="mt-9">
-        <h2 className="font-serif text-[clamp(2rem,3vw,2.8rem)] leading-none text-syncus-blue">
+      <section className="mt-8">
+        <h2 className="font-serif text-[clamp(1.7rem,2.6vw,2.35rem)] leading-none text-syncus-blue">
           Active Job Postings ({publishedJobs.length})
         </h2>
-        <div className="mt-5 grid gap-4">
+        <div className="mt-4 grid gap-3">
           {publishedJobs.length === 0 && (
-            <div className="rounded-[18px] border-2 border-dashed border-syncus-blue/35 px-6 py-12 text-center">
-              <p className="text-xl font-black">No published jobs yet.</p>
+            <div className="rounded-2xl border-2 border-dashed border-syncus-blue/35 px-6 py-10 text-center">
+              <p className="text-lg font-black sm:text-xl">No published jobs yet.</p>
               <p className="mt-2 text-sm font-bold text-syncus-blue/55">
                 Publish a draft or post a new job to start receiving applicants.
               </p>
@@ -284,13 +284,13 @@ export function EmployerDashboardPage() {
             return (
               <article
                 key={job.job_id}
-                className="grid gap-4 rounded-[18px] border-2 border-syncus-blue bg-syncus-cream px-5 py-4 md:grid-cols-[auto_minmax(0,1fr)_88px_88px_auto] md:items-center"
+                className="grid gap-4 rounded-2xl border-2 border-syncus-blue bg-syncus-cream px-4 py-4 md:grid-cols-[auto_minmax(0,1fr)_72px_72px_auto] md:items-center"
               >
-                <span className="grid h-12 w-12 place-items-center rounded-xl bg-syncus-blue text-syncus-cream">
-                  <BriefcaseBusiness size={21} />
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-syncus-blue text-syncus-cream">
+                  <BriefcaseBusiness size={18} />
                 </span>
                 <div className="min-w-0">
-                  <h3 className="truncate text-2xl font-medium leading-tight text-syncus-blue">{job.title}</h3>
+                  <h3 className="truncate text-xl font-medium leading-tight text-syncus-blue">{job.title}</h3>
                   <p className="text-sm font-medium text-syncus-blue/70">
                     {job.company_name} · {job.location}
                   </p>
@@ -301,15 +301,15 @@ export function EmployerDashboardPage() {
                   )}
                 </div>
                 <span className="text-center">
-                  <strong className="block text-2xl font-black">{job.applications_count}</strong>
+                  <strong className="block text-xl font-black">{job.applications_count}</strong>
                   <span className="text-xs text-syncus-blue/60">Applicants</span>
                 </span>
                 <span className="text-center">
-                  <strong className="block text-2xl font-black">{Math.max(0, Math.round(job.applications_count * 0.1))}</strong>
+                  <strong className="block text-xl font-black">{Math.max(0, Math.round(job.applications_count * 0.1))}</strong>
                   <span className="text-xs text-syncus-blue/60">Interviews</span>
                 </span>
                 <button
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-syncus-blue px-5 text-sm font-black text-syncus-cream transition hover:-translate-y-0.5"
+                  className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-syncus-blue px-4 text-xs font-black text-syncus-cream transition hover:-translate-y-0.5 sm:text-sm"
                   onClick={() => navigate("/employer/review-applications", { state: { jobId: job.job_id } })}
                   type="button"
                 >
@@ -322,9 +322,9 @@ export function EmployerDashboardPage() {
         </div>
       </section>
 
-      <section className="mt-10 max-w-[520px] rounded-[18px] border-2 border-syncus-blue bg-syncus-cream p-7">
-        <h2 className="font-serif text-3xl leading-none">Upcoming Interviews</h2>
-        <div className="mt-5 grid gap-3">
+      <section className="mt-8 max-w-[620px] rounded-2xl border-2 border-syncus-blue bg-syncus-cream p-5 sm:p-6">
+        <h2 className="font-serif text-[clamp(1.55rem,2.3vw,2rem)] leading-none">Upcoming Interviews</h2>
+        <div className="mt-4 grid gap-3">
           {interviewCount === 0 ? (
             <p className="rounded-xl border-2 border-dashed border-syncus-blue/25 px-4 py-5 text-sm font-bold text-syncus-blue/55">
               No live interview applications yet.

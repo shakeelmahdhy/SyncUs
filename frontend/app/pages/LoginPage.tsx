@@ -8,6 +8,7 @@ import {
   loginAccount,
   storeAccessToken,
   storeAccountType,
+  storeSessionProfile,
   type AccountType,
 } from "../lib/api";
 
@@ -113,6 +114,11 @@ export function LoginPage() {
 
         storeAccessToken(response.access_token);
         storeAccountType("employer");
+        storeSessionProfile({
+          displayName: response.user.email,
+          email: response.user.email,
+          accountType: "employer",
+        });
 
         try {
           await getEmployerJobStats();
@@ -140,7 +146,12 @@ export function LoginPage() {
       storeAccountType("job_seeker");
 
       try {
-        await getAccountProfile();
+        const profile = await getAccountProfile();
+        storeSessionProfile({
+          displayName: `${profile.first_name} ${profile.last_name}`.trim() || profile.email || response.user.email,
+          email: profile.email ?? response.user.email,
+          accountType: "job_seeker",
+        });
       } catch {
         clearAccessToken();
         setError("This account is not set up as a job seeker. Switch to Employer or register again.");

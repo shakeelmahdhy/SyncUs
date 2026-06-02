@@ -17,6 +17,7 @@ function resolveApiBaseUrl(): string {
 const API_BASE_URL = resolveApiBaseUrl();
 const AUTH_TOKEN_KEY = "syncus_access_token";
 const ACCOUNT_TYPE_KEY = "syncus_account_type";
+const SESSION_PROFILE_KEY = "syncus_session_profile";
 const AUTH_CHANGED_EVENT = "syncus-auth-changed";
 
 function notifyAuthChanged() {
@@ -35,6 +36,41 @@ export function onAuthChanged(listener: () => void) {
 }
 
 export type StoredAccountType = "job_seeker" | "employer";
+
+export interface StoredSessionProfile {
+  displayName?: string | null;
+  email?: string | null;
+  accountType?: StoredAccountType | null;
+}
+
+export function storeSessionProfile(profile: StoredSessionProfile) {
+  if (typeof window === "undefined") return;
+  const current = getStoredSessionProfile() ?? {};
+  const next = { ...current, ...profile };
+  const serialized = JSON.stringify(next);
+  if (window.localStorage.getItem(SESSION_PROFILE_KEY) === serialized) return;
+  window.localStorage.setItem(SESSION_PROFILE_KEY, serialized);
+  notifyAuthChanged();
+}
+
+export function getStoredSessionProfile(): StoredSessionProfile | null {
+  if (typeof window === "undefined") return null;
+  const raw = window.localStorage.getItem(SESSION_PROFILE_KEY);
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw) as StoredSessionProfile;
+  } catch {
+    window.localStorage.removeItem(SESSION_PROFILE_KEY);
+    return null;
+  }
+}
+
+export function clearStoredSessionProfile() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(SESSION_PROFILE_KEY);
+  notifyAuthChanged();
+}
 
 export function storeAccountType(accountType: StoredAccountType) {
   window.localStorage.setItem(ACCOUNT_TYPE_KEY, accountType);
@@ -68,6 +104,7 @@ export function clearAccessToken() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(AUTH_TOKEN_KEY);
   window.localStorage.removeItem(ACCOUNT_TYPE_KEY);
+  window.localStorage.removeItem(SESSION_PROFILE_KEY);
   notifyAuthChanged();
 }
 
@@ -311,6 +348,7 @@ export interface SearchJobResult {
   job_id: string;
   title: string;
   company_name: string;
+  description?: string;
   location: string;
   work_mode: WorkMode | "";
   required_skills: string[];
