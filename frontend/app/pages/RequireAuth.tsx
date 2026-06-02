@@ -1,6 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Navigate, useLocation } from "react-router";
-import { getAccountProfile, getStoredAccountType, hasStoredAccessToken } from "../lib/api";
+import {
+  clearAccessToken,
+  getAccountProfile,
+  getStoredAccountType,
+  hasStoredAccessToken,
+  isAuthFailureMessage,
+} from "../lib/api";
 
 export function RequireAuth({ children }: { children: ReactNode }) {
   const location = useLocation();
@@ -23,7 +29,11 @@ export function RequireAuth({ children }: { children: ReactNode }) {
       .then(() => {
         if (isMounted) setAllowed(true);
       })
-      .catch(() => {
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : "";
+        if (isAuthFailureMessage(message)) {
+          clearAccessToken();
+        }
         if (isMounted) setAllowed(false);
       });
 

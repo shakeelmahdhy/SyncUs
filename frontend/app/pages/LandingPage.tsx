@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Briefcase, CheckCircle2, ChevronLeft, ChevronRight, Filter, MapPin, Search, X } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import { searchJobDiscovery } from '../lib/api';
+import {
+  createApplication,
+  getStoredAccountType,
+  hasStoredAccessToken,
+  listApplications,
+  onAuthChanged,
+  searchJobDiscovery,
+} from '../lib/api';
 import { type Job, toFrontendSearchJob } from '../lib/jobs';
 
 const jobTypes = ['Full-Time', 'Part-Time', 'Casual', 'Contract'];
@@ -21,7 +28,21 @@ function FilterCheckbox({ label, checked, onChange }: { label: string; checked: 
   );
 }
 
-function JobCard({ job, onApply, onView }: { job: Job; onApply: () => void; onView: () => void }) {
+function JobCard({
+  job,
+  applied,
+  applying,
+  onApply,
+  onView,
+  onViewApplication,
+}: {
+  job: Job;
+  applied: boolean;
+  applying: boolean;
+  onApply: () => void;
+  onView: () => void;
+  onViewApplication: () => void;
+}) {
   return (
     <article className="rounded-2xl border-2 border-syncus-green bg-syncus-cream p-4 shadow-card transition duration-200 hover:-translate-y-0.5 hover:shadow-syncus sm:p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -64,8 +85,17 @@ function JobCard({ job, onApply, onView }: { job: Job; onApply: () => void; onVi
             <button className="min-h-9 rounded-lg border-2 border-syncus-blue px-5 text-sm font-bold text-syncus-blue transition hover:bg-syncus-blue hover:text-syncus-cream" type="button" onClick={onView}>
               View role
             </button>
-            <button className="min-h-9 rounded-lg bg-syncus-blue px-6 text-sm font-bold text-syncus-cream transition hover:bg-syncus-green" type="button" onClick={onApply}>
-              Quick Apply
+            <button
+              className={`min-h-9 rounded-lg px-6 text-sm font-bold transition ${
+                applied
+                  ? 'border-2 border-syncus-green bg-syncus-green/10 text-syncus-green hover:bg-syncus-green hover:text-syncus-cream'
+                  : 'bg-syncus-blue text-syncus-cream hover:bg-syncus-green'
+              }`}
+              type="button"
+              onClick={applied ? onViewApplication : onApply}
+              disabled={applying}
+            >
+              {applying ? 'Applying...' : applied ? 'View application' : 'Quick Apply'}
             </button>
           </div>
         </div>
@@ -84,6 +114,9 @@ export function LandingPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [applyingJobId, setApplyingJobId] = useState<string | null>(null);
+  const [applyError, setApplyError] = useState<string | null>(null);
+  const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set());
   const [loadingJobs, setLoadingJobs] = useState(true);
   const [jobsError, setJobsError] = useState<string | null>(null);
 
@@ -109,6 +142,34 @@ export function LandingPage() {
 
     return () => {
       isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadAppliedJobs = () => {
+      if (!hasStoredAccessToken() || getStoredAccountType() === 'employer') {
+        setAppliedJobIds(new Set());
+        return;
+      }
+
+      listApplications()
+        .then(({ items }) => {
+          if (!isMounted) return;
+          setAppliedJobIds(new Set(items.map((item) => item.job_id)));
+        })
+        .catch(() => {
+          if (isMounted) setAppliedJobIds(new Set());
+        });
+    };
+
+    loadAppliedJobs();
+    const unsubscribe = onAuthChanged(loadAppliedJobs);
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
     };
   }, []);
 
@@ -144,6 +205,37 @@ export function LandingPage() {
     setLocation('');
     setSearch('');
     setCurrentPage(1);
+  };
+
+  const handleQuickApply = async (job: Job) => {
+    setSelectedJob(job);
+    setApplyError(null);
+
+    if (appliedJobIds.has(String(job.id))) {
+      navigate('/applications');
+      return;
+    }
+
+    if (getStoredAccountType() === 'employer') {
+      setApplyError('Employer accounts cannot apply to jobs. Switch to a job seeker account to apply.');
+      return;
+    }
+
+    if (!hasStoredAccessToken()) {
+      setShowApplyModal(true);
+      return;
+    }
+
+    setApplyingJobId(String(job.id));
+    try {
+      const application = await createApplication({ job_id: String(job.id), resume_id: null });
+      setAppliedJobIds((current) => new Set(current).add(application.job_id));
+      navigate('/applications');
+    } catch (error) {
+      setApplyError(error instanceof Error ? error.message : 'Application could not be submitted.');
+    } finally {
+      setApplyingJobId(null);
+    }
   };
 
   return (
@@ -230,11 +322,11 @@ export function LandingPage() {
                 <JobCard
                   key={job.id}
                   job={job}
-                  onApply={() => {
-                    setSelectedJob(job);
-                    setShowApplyModal(true);
-                  }}
+                  applied={appliedJobIds.has(String(job.id))}
+                  applying={applyingJobId === String(job.id)}
+                  onApply={() => void handleQuickApply(job)}
                   onView={() => navigate(`/jobs/${job.id}`)}
+                  onViewApplication={() => navigate('/applications')}
                 />
               )) : (
                 <div className="rounded-2xl border-2 border-dashed border-syncus-green px-6 py-16 text-center text-syncus-green">
@@ -259,6 +351,11 @@ export function LandingPage() {
                 <button className="grid h-10 w-10 place-items-center rounded-xl border-2 border-syncus-green text-syncus-green transition hover:bg-syncus-green hover:text-syncus-cream" type="button" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} aria-label="Next page"><ChevronRight size={18} /></button>
               </div>
             )}
+            {applyError && (
+              <p className="mt-5 rounded-lg bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                {applyError}
+              </p>
+            )}
           </section>
         </section>
       </main>
@@ -280,6 +377,13 @@ export function LandingPage() {
             <button className="mt-5 text-xs font-bold text-syncus-blue/70 underline underline-offset-4" type="button" onClick={() => setShowApplyModal(false)}>
               Continue Browsing
             </button>
+          </section>
+        </div>
+      )}
+      {applyingJobId && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-syncus-blue/35 px-5 backdrop-blur-sm">
+          <section className="rounded-3xl border-2 border-syncus-green bg-syncus-cream px-8 py-6 text-center shadow-syncus">
+            <p className="text-sm font-bold text-syncus-blue">Submitting your application...</p>
           </section>
         </div>
       )}

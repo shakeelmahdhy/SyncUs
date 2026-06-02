@@ -1,5 +1,6 @@
 from app.core.supabase_client import get_supabase_service_client
 from app.core.supabase_client import get_supabase_anon_client
+from app.core.supabase_client import create_supabase_service_client
 from fastapi import UploadFile
 from uuid import UUID
 import uuid
@@ -323,15 +324,37 @@ def list_user_resumes(user_id: UUID):
 
 
 def parse_profile_data(user_id: UUID):
-    """Placeholder for future NLP-based parsing/inference."""
+    """Return normalized profile data and a simple completeness score."""
     profile = get_user_profile(user_id)
 
     if not profile:
         return {"error": "User not found"}
 
+    required_fields = [
+        "first_name",
+        "last_name",
+        "email",
+        "phone",
+        "education",
+        "title",
+        "experience",
+    ]
+    completed_fields = [
+        field
+        for field in required_fields
+        if str(profile.get(field) or "").strip()
+    ]
+    has_skills = bool(profile.get("skills"))
+    completed_count = len(completed_fields) + (1 if has_skills else 0)
+    total_count = len(required_fields) + 1
+
     return {
         "user_id": str(user_id),
-        "message": "Profile parsing placeholder (future NLP integration)",
+        "profile_completeness": round((completed_count / total_count) * 100),
+        "missing_fields": [
+            field for field in required_fields if field not in completed_fields
+        ]
+        + ([] if has_skills else ["skills"]),
         "profile": profile,
     }
 
@@ -343,13 +366,23 @@ def _auth_credentials(email: str, password: str) -> dict[str, str]:
 
 
 def _sign_in(email: str, password: str):
-    """Sign in via Supabase Auth using the publishable/anon client (never the service client)."""
-    client = _anon_supabase()
+    """Sign in via Supabase Auth, preferring publishable key and falling back server-side."""
     credentials = _auth_credentials(email, password)
-    try:
-        return client.auth.sign_in_with_password(credentials)
-    except TypeError:
-        return client.auth.sign_in_with_password(email=email, password=password)
+    errors: list[Exception] = []
+
+    for client_factory in (_anon_supabase, create_supabase_service_client):
+        client = client_factory()
+        try:
+            return client.auth.sign_in_with_password(credentials)
+        except TypeError:
+            try:
+                return client.auth.sign_in_with_password(email=email, password=password)
+            except Exception as exc:
+                errors.append(exc)
+        except Exception as exc:
+            errors.append(exc)
+
+    raise errors[-1] if errors else RuntimeError("Unable to sign in")
 
 
 def _ensure_profile_row(service, user_id: str, payload) -> tuple[str, dict, dict | None]:
@@ -422,9 +455,16 @@ def register_user(payload):
                 pass
             return profile_error
 
-        session_response = _sign_in(payload.email, payload.password)
-        session = getattr(session_response, "session", None)
-        access_token = getattr(session, "access_token", None) if session else None
+        access_token = None
+        try:
+            session_response = _sign_in(payload.email, payload.password)
+            session = getattr(session_response, "session", None)
+            access_token = getattr(session, "access_token", None) if session else None
+        except Exception:
+            # The Auth user and profile already exist. Some Supabase projects
+            # disallow immediate sign-in after admin creation, so registration
+            # should still succeed and let the frontend ask the user to sign in.
+            access_token = None
 
         return {
             "access_token": access_token,

@@ -89,6 +89,29 @@ def get_supabase_service_client():
     return _service_client
 
 
+def create_supabase_service_client():
+    """Return a fresh Supabase client using the SECRET key.
+
+    Use this for Auth operations that may attach a user session to the client.
+    Data-access code should keep using the cached service client above.
+    """
+    url = _require_env("SUPABASE_URL")
+    key = _require_env("SUPABASE_SECRET_KEY")
+    create_client = _import_supabase_create_client()
+    try:
+        from supabase.lib.client_options import ClientOptions
+        from supabase_auth import AuthFlowType
+
+        options = ClientOptions(
+            auto_refresh_token=False,
+            persist_session=False,
+            flow_type=AuthFlowType.IMPLICIT,
+        )
+        return create_client(url, key, options)
+    except Exception:
+        return create_client(url, key)
+
+
 def reset_supabase_service_client() -> None:
     """Drop the cached service client (e.g. after accidental user sign-in on it)."""
     global _service_client

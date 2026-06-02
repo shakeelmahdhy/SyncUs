@@ -113,11 +113,15 @@ class JobService:
 
             row = response.data[0]
 
-            # Increment view count if job is published and not viewed by owner
+            # Increment view count if job is published and not viewed by owner.
+            # Some deployed Supabase projects do not have this optional RPC yet;
+            # analytics should never prevent a job detail response.
             if row["status"] == JobStatus.PUBLISHED.value and str(employer_id) != row["employer_id"]:
-                self.db.rpc('increment_job_views', {'job_id': str(job_id)}).execute()
-                # Update the local row object so the returned Job model has the incremented count
-                row["views_count"] = row.get("views_count", 0) + 1
+                try:
+                    self.db.rpc('increment_job_views', {'job_id': str(job_id)}).execute()
+                    row["views_count"] = row.get("views_count", 0) + 1
+                except Exception:
+                    pass
 
             emp_id = UUID(row["employer_id"])
             return self._row_to_job(row, company_name=self._company_name_for(emp_id))

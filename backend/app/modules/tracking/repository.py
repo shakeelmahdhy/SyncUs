@@ -62,6 +62,24 @@ def insert_application(
     return rows[0]  # type: ignore[return-value]
 
 
+def select_application_by_job_and_user(
+    user_id: UUID,
+    job_id: UUID,
+) -> ApplicationRow | None:
+    """Return the user's application for a job, if one already exists."""
+    client = get_supabase_service_client()
+    response = (
+        client.table(_TABLE)
+        .select("*")
+        .eq("job_seeker_id", str(user_id))
+        .eq("job_id", str(job_id))
+        .limit(1)
+        .execute()
+    )
+    rows = response.data or []
+    return rows[0] if rows else None  # type: ignore[return-value]
+
+
 def select_applications_by_user(user_id: UUID) -> list[ApplicationRow]:
     """
     Return all applications where `job_seeker_id = user_id`.

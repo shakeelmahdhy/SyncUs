@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { clearAccessToken, getAccountProfile, hasStoredAccessToken } from "../../lib/api";
+import { clearAccessToken, getAccountProfile, hasStoredAccessToken, isAuthFailureMessage, onAuthChanged } from "../../lib/api";
 import { SyncUsMark } from "./SyncUsMark";
 
 export function SiteNav() {
@@ -9,28 +9,41 @@ export function SiteNav() {
   const [displayName, setDisplayName] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!hasStoredAccessToken()) {
-      setSignedIn(false);
-      setDisplayName(null);
-      return;
-    }
-
     let isMounted = true;
 
-    getAccountProfile()
-      .then((profile) => {
-        if (!isMounted) return;
-        setSignedIn(true);
-        setDisplayName(`${profile.first_name} ${profile.last_name}`.trim() || profile.email || null);
-      })
-      .catch(() => {
-        if (!isMounted) return;
-        setSignedIn(hasStoredAccessToken());
+    const refreshSession = () => {
+      if (!hasStoredAccessToken()) {
+        setSignedIn(false);
         setDisplayName(null);
-      });
+        return;
+      }
+
+      getAccountProfile()
+        .then((profile) => {
+          if (!isMounted) return;
+          setSignedIn(true);
+          setDisplayName(`${profile.first_name} ${profile.last_name}`.trim() || profile.email || null);
+        })
+        .catch((error) => {
+          if (!isMounted) return;
+          const message = error instanceof Error ? error.message : "";
+          if (isAuthFailureMessage(message)) {
+            clearAccessToken();
+            setSignedIn(false);
+            setDisplayName(null);
+            return;
+          }
+          setSignedIn(hasStoredAccessToken());
+          setDisplayName(null);
+        });
+    };
+
+    refreshSession();
+    const unsubscribe = onAuthChanged(refreshSession);
 
     return () => {
       isMounted = false;
+      unsubscribe();
     };
   }, []);
 

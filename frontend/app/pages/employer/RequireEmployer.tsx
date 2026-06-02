@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router";
-import { clearAccessToken, getEmployerJobStats, hasStoredAccessToken } from "../../lib/api";
+import { clearAccessToken, getEmployerJobStats, hasStoredAccessToken, isAuthFailureMessage } from "../../lib/api";
 
 export function RequireEmployer({ children }: { children: ReactNode }) {
   const location = useLocation();
@@ -21,6 +21,10 @@ export function RequireEmployer({ children }: { children: ReactNode }) {
         const message = error instanceof Error ? error.message : "";
         if (message.includes("Cannot reach the SyncUs API")) {
           if (isMounted) setAllowed(true);
+          return;
+        }
+        if (!isAuthFailureMessage(message) && isMounted) {
+          setAllowed(false);
           return;
         }
         clearAccessToken();
