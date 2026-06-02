@@ -3,6 +3,7 @@ pipeline {
     
     environment {
         RENDER_API_KEY = credentials('render-api-key')
+        PYTHON_EXE = 'C:\\Program Files\\Python312\\python.exe'
         
         RENDER_BACKEND_DEPLOY_HOOK = credentials('backend-deploy-hook')
         
@@ -39,8 +40,8 @@ pipeline {
                     steps {
                         dir('backend') {
                             bat '''
-                                where python || (echo Python is not installed or not on PATH. & exit /b 1)
-                                python -m venv venv
+                                if not exist "%PYTHON_EXE%" (echo Python executable not found at %PYTHON_EXE% & exit /b 1)
+                                "%PYTHON_EXE%" -m venv venv
                                 venv\\Scripts\\python -m pip install -r requirements.txt
                             '''
                         }
