@@ -31,7 +31,7 @@ app = FastAPI(
 )
 
 _frontend = os.getenv("FRONTEND_URL", "").strip()
-_cors_origins = ["http://localhost:3000", "http://localhost:5173"]
+_cors_origins = ["http://localhost:3000", "http://localhost:5173", "https://syncus-1.onrender.com"]
 if _frontend:
     _cors_origins.append(_frontend)
 
