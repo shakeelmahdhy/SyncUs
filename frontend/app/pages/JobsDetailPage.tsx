@@ -11,7 +11,15 @@ import {
   Star,
   Zap,
 } from "lucide-react";
-import { createApplication, getJob, hasStoredAccessToken, searchJobDiscovery } from "../lib/api";
+import {
+  createApplication,
+  getJob,
+  getStoredAccountType,
+  hasStoredAccessToken,
+  listApplications,
+  onAuthChanged,
+  searchJobDiscovery,
+} from "../lib/api";
 import { type Job, toFrontendJob, toFrontendSearchJob } from "../lib/jobs";
 import { SyncUsMark } from "../shared/components";
 
@@ -26,6 +34,7 @@ export function JobDetailPage() {
   const [submitted, setSubmitted] = useState(false);
   const [submittingApplication, setSubmittingApplication] = useState(false);
   const [applicationError, setApplicationError] = useState<string | null>(null);
+  const [existingApplicationId, setExistingApplicationId] = useState<string | null>(null);
   const [coverLetter, setCoverLetter] = useState("");
 
   useEffect(() => {
@@ -62,6 +71,35 @@ export function JobDetailPage() {
     };
   }, [id]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadExistingApplication = () => {
+      if (!id || !hasStoredAccessToken() || getStoredAccountType() === "employer") {
+        setExistingApplicationId(null);
+        return;
+      }
+
+      listApplications()
+        .then(({ items }) => {
+          if (!isMounted) return;
+          const existing = items.find((item) => item.job_id === id);
+          setExistingApplicationId(existing?.id ?? null);
+        })
+        .catch(() => {
+          if (isMounted) setExistingApplicationId(null);
+        });
+    };
+
+    loadExistingApplication();
+    const unsubscribe = onAuthChanged(loadExistingApplication);
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [id]);
+
   const similar = useMemo(
     () =>
       allJobs
@@ -92,6 +130,16 @@ export function JobDetailPage() {
   }
 
   const openApplyModal = () => {
+    if (existingApplicationId) {
+      navigate("/applications");
+      return;
+    }
+
+    if (getStoredAccountType() === "employer") {
+      setApplicationError("Employer accounts cannot apply to jobs. Switch to a job seeker account to apply.");
+      return;
+    }
+
     if (!hasStoredAccessToken()) {
       navigate("/login", { state: { from: `/jobs/${job?.id}` } });
       return;
@@ -100,6 +148,11 @@ export function JobDetailPage() {
   };
 
   const handleSubmit = async () => {
+    if (getStoredAccountType() === "employer") {
+      setApplicationError("Employer accounts cannot apply to jobs. Switch to a job seeker account to apply.");
+      return;
+    }
+
     if (!hasStoredAccessToken()) {
       navigate("/login", { state: { from: `/jobs/${job?.id}` } });
       return;
@@ -109,7 +162,8 @@ export function JobDetailPage() {
     setApplicationError(null);
 
     try {
-      await createApplication({ job_id: String(job.id), resume_id: null });
+      const application = await createApplication({ job_id: String(job.id), resume_id: null });
+      setExistingApplicationId(application.id);
       setSubmitted(true);
       window.setTimeout(() => {
         setShowApplyModal(false);
@@ -138,6 +192,11 @@ export function JobDetailPage() {
         {jobError && (
           <p className="mb-5 rounded-xl border-2 border-syncus-blue/15 bg-syncus-blue/5 px-4 py-3 text-sm font-bold text-syncus-blue">
             {jobError}
+          </p>
+        )}
+        {applicationError && !showApplyModal && (
+          <p className="mb-5 rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+            {applicationError}
           </p>
         )}
 
@@ -203,7 +262,7 @@ export function JobDetailPage() {
                 className="rounded-2xl bg-syncus-blue px-10 py-3 text-base font-bold text-syncus-cream transition hover:bg-syncus-green"
                 type="button"
               >
-                Apply Now
+                {existingApplicationId ? "View Application" : "Apply Now"}
               </button>
             </section>
 
@@ -245,7 +304,7 @@ export function JobDetailPage() {
                 className="w-full rounded-2xl bg-syncus-green py-3 text-sm font-bold text-syncus-cream transition hover:bg-syncus-blue"
                 type="button"
               >
-                Quick Apply
+                {existingApplicationId ? "View Application" : "Quick Apply"}
               </button>
             </section>
 

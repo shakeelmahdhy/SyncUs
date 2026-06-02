@@ -16,6 +16,7 @@ from .mapping import application_row_to_response
 from .repository import (
     insert_application,
     select_application_by_id,
+    select_application_by_job_and_user,
     select_application_for_user,
     select_applications_by_user,
     select_applications_for_job,
@@ -37,8 +38,23 @@ from .transitions import can_transition
 def create_application(
     user_id: UUID, payload: ApplicationCreateRequest
 ) -> ApplicationResponse:
-    """Create a new application for ``user_id`` and return the persisted row."""
-    row = insert_application(user_id, payload.job_id, payload.resume_id)
+    """Create or return the user's existing application for the job."""
+    existing = select_application_by_job_and_user(user_id, payload.job_id)
+    if existing is not None:
+        return application_row_to_response(existing)
+
+    try:
+        row = insert_application(user_id, payload.job_id, payload.resume_id)
+    except Exception as exc:
+        message = str(exc).lower()
+        if "duplicate" in message or "23505" in message or "unique" in message:
+            existing = select_application_by_job_and_user(user_id, payload.job_id)
+            if existing is not None:
+                return application_row_to_response(existing)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Application could not be submitted: {exc}",
+        ) from exc
     return application_row_to_response(row)
 
 

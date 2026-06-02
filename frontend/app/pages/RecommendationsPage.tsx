@@ -27,7 +27,7 @@ export function RecommendationsPage() {
       .then((items) => {
         if (!isMounted) return;
         setRoles(items);
-        setSavedIds(items.length > 0 ? [items[0].jobId] : []);
+        setSavedIds((current) => current.filter((jobId) => items.some((item) => item.jobId === jobId)));
         setError(null);
       })
       .catch((err) => {
