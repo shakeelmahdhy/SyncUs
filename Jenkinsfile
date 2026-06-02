@@ -51,11 +51,31 @@ pipeline {
             }
         }
 
-        stage('Backend Test') {
+        stage('Backend Smoke Tests') {
             steps {
                 dir('backend') {
                     bat '''
-                        venv\\Scripts\\python -m pytest tests/ -v
+                        venv\\Scripts\\python -m pytest tests/ -m smoke -v
+                    '''
+                }
+            }
+        }
+
+        stage('Backend Unit Tests') {
+            steps {
+                dir('backend') {
+                    bat '''
+                        venv\\Scripts\\python -m pytest tests/ -m unit -v
+                    '''
+                }
+            }
+        }
+
+        stage('Backend Integration Tests') {
+            steps {
+                dir('backend') {
+                    bat '''
+                        venv\\Scripts\\python -m pytest tests/ -m integration -v
                     '''
                 }
             }

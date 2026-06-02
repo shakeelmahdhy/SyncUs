@@ -10,4 +10,3 @@ def test_static_jobs_routes_are_registered_before_dynamic_job_id() -> None:
 
     assert paths.index("/employer/my-jobs") < dynamic_index
     assert paths.index("/stats/overview") < dynamic_index
-
