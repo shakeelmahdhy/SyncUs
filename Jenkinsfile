@@ -4,9 +4,9 @@ pipeline {
     environment {
         RENDER_API_KEY = credentials('render-api-key')
         
-        RENDER_BACKEND_DEPLOY_HOOK = "https://api.render.com/deploy/srv-d8f6gii8qa3s738l1smg?key=BzIlVQeFRzY"
+        RENDER_BACKEND_DEPLOY_HOOK = credentials('backend-deploy-hook')
         
-        RENDER_FRONTEND_DEPLOY_HOOK = "https://api.render.com/deploy/srv-d8f6kpl53gjs739ol8sg?key=qwONUKftKJo"
+        RENDER_FRONTEND_DEPLOY_HOOK = credentials('frontend-deploy-hook')
     }
     
     options {
@@ -29,8 +29,8 @@ pipeline {
                 stage('Frontend Build') {
                     steps {
                         dir('frontend') {
-                            sh 'npm install'
-                            sh 'npm run build'
+                            bat 'npm install'
+                            bat 'npm run build'
                         }
                     }
                 }
@@ -38,9 +38,9 @@ pipeline {
                 stage('Backend Build') {
                     steps {
                         dir('backend') {
-                            sh '''
-                                python3 -m venv venv
-                                . venv/bin/activate
+                            bat '''
+                                py -m venv venv
+                                call venv\\Scripts\\activate
                                 pip install -r requirements.txt
                             '''
                         }
@@ -52,8 +52,8 @@ pipeline {
         stage('Backend Test') {
             steps {
                 dir('backend') {
-                    sh '''
-                        . venv/bin/activate
+                    bat '''
+                        call venv\\Scripts\\activate
                         python -m pytest tests/ -v
                     '''
                 }
@@ -64,18 +64,14 @@ pipeline {
             steps {
                 script {
                     echo "Deploying Backend to Render..."
-                    sh """
-                        curl -X POST "${RENDER_BACKEND_DEPLOY_HOOK}" \
-                        -H "Accept: application/json" \
-                        -w "HTTP Status: %{http_code}\\n"
-                    """
+                    bat '''
+                        curl -X POST "%RENDER_BACKEND_DEPLOY_HOOK%" -H "Accept: application/json"
+                    '''
         
                     echo "Deploying Frontend to Render..."
-                    sh """
-                        curl -X POST "${RENDER_FRONTEND_DEPLOY_HOOK}" \
-                        -H "Accept: application/json" \
-                        -w "HTTP Status: %{http_code}\\n"
-                    """
+                    bat '''
+                        curl -X POST "%RENDER_FRONTEND_DEPLOY_HOOK%" -H "Accept: application/json"
+                    '''
                     
                     echo "Deployment requests sent successfully!"
                 }
