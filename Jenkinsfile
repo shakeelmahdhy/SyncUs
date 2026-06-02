@@ -3,7 +3,7 @@ pipeline {
     
     environment {
         RENDER_API_KEY = credentials('render-api-key')
-        PYTHON_EXE = 'C:\\Program Files\\Python314\\python.exe'
+        PYTHON_EXE = 'C:\\Program Files\\Python312\\python.exe'
         
         RENDER_BACKEND_DEPLOY_HOOK = credentials('backend-deploy-hook')
         
